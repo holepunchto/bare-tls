@@ -1,0 +1,3 @@
+[submodule "vendor/libtls"]
+	path = vendor/libtls
+	url = ../../holepunchto/libtls.git
