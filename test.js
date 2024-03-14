@@ -19,15 +19,12 @@ test('server + client', async (t) => {
   })
 
   const server = new tls.Socket(serverSocket, {
+    isServer: true,
     cert: fs.readFileSync('test/fixtures/cert.crt'),
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  server.accept()
-
   const client = new tls.Socket(clientSocket)
-
-  client.connect()
 
   const l = t.test('write + read')
   l.plan(2)

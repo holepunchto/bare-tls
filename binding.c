@@ -138,13 +138,13 @@ static js_value_t *
 bare_tls_init (js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 4;
-  js_value_t *argv[4];
+  size_t argc = 7;
+  js_value_t *argv[7];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 4);
+  assert(argc == 7);
 
   bare_tls_context_t *context;
   err = js_get_typedarray_info(env, argv[0], NULL, (void **) &context, NULL, NULL, NULL);
@@ -162,19 +162,63 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
     return NULL;
   }
 
+  bool is_server;
+  err = js_get_value_bool(env, argv[1], &is_server);
+  assert(err == 0);
+
+  if (is_server) err = tls_accept(socket->handle);
+  else err = tls_connect(socket->handle);
+  assert(err == 0);
+
+  bool has_cert;
+  err = js_is_typedarray(env, argv[2], &has_cert);
+  assert(err == 0);
+
+  if (has_cert) {
+    char *pem;
+    size_t len;
+    err = js_get_typedarray_info(env, argv[2], NULL, (void **) &pem, &len, NULL, NULL);
+    assert(err == 0);
+
+    err = tls_use_certificate(socket->handle, pem, (int) len);
+    if (err < 0) {
+      tls_destroy(socket->handle);
+      js_throw_error(env, NULL, "TLS error");
+      return NULL;
+    }
+  }
+
+  bool has_key;
+  err = js_is_typedarray(env, argv[3], &has_key);
+  assert(err == 0);
+
+  if (has_key) {
+    char *pem;
+    size_t len;
+    err = js_get_typedarray_info(env, argv[3], NULL, (void **) &pem, &len, NULL, NULL);
+    assert(err == 0);
+
+    err = tls_use_key(socket->handle, pem, (int) len);
+    if (err < 0) {
+      tls_destroy(socket->handle);
+      js_throw_error(env, NULL, "TLS error");
+      return NULL;
+    }
+  }
+
   js_value_t *result;
   err = js_create_typedarray(env, js_uint8_array, sizeof(*socket), handle, 0, &result);
   assert(err == 0);
 
   socket->env = env;
 
-  err = js_create_reference(env, argv[1], 1, &socket->ctx);
+  err = js_create_reference(env, argv[4], 1, &socket->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[2], 1, &socket->on_read);
+  err = js_create_reference(env, argv[5], 1, &socket->on_read);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[3], 1, &socket->on_write);
+  err = js_create_reference(env, argv[6], 1, &socket->on_write);
   assert(err == 0);
 
   return result;
@@ -211,66 +255,6 @@ bare_tls_destroy (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_tls_use_certificate (js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  size_t argc = 2;
-  js_value_t *argv[2];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 2);
-
-  bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
-  assert(err == 0);
-
-  char *pem;
-  size_t len;
-  err = js_get_typedarray_info(env, argv[1], NULL, (void **) &pem, &len, NULL, NULL);
-  assert(err == 0);
-
-  err = tls_use_certificate(socket->handle, pem, (int) len);
-  if (err < 0) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
-  }
-
-  return NULL;
-}
-
-static js_value_t *
-bare_tls_use_key (js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  size_t argc = 2;
-  js_value_t *argv[2];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 2);
-
-  bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
-  assert(err == 0);
-
-  char *pem;
-  size_t len;
-  err = js_get_typedarray_info(env, argv[1], NULL, (void **) &pem, &len, NULL, NULL);
-  assert(err == 0);
-
-  err = tls_use_key(socket->handle, pem, (int) len);
-  if (err < 0) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
-  }
-
-  return NULL;
-}
-
-static js_value_t *
 bare_tls_handshake (js_env_t *env, js_callback_info_t *info) {
   int err;
 
@@ -297,56 +281,6 @@ bare_tls_handshake (js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
 
   return result;
-}
-
-static js_value_t *
-bare_tls_connect (js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  size_t argc = 1;
-  js_value_t *argv[1];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 1);
-
-  bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
-  assert(err == 0);
-
-  err = tls_connect(socket->handle);
-  if (err < 0) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
-  }
-
-  return NULL;
-}
-
-static js_value_t *
-bare_tls_accept (js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  size_t argc = 1;
-  js_value_t *argv[1];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 1);
-
-  bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
-  assert(err == 0);
-
-  err = tls_accept(socket->handle);
-  if (err < 0) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
-  }
-
-  return NULL;
 }
 
 static js_value_t *
@@ -464,11 +398,7 @@ init (js_env_t *env, js_value_t *exports) {
 
   V("init", bare_tls_init);
   V("destroy", bare_tls_destroy);
-  V("useCertificate", bare_tls_use_certificate);
-  V("useKey", bare_tls_use_key);
   V("handshake", bare_tls_handshake);
-  V("connect", bare_tls_connect);
-  V("accept", bare_tls_accept);
   V("read", bare_tls_read);
   V("write", bare_tls_write);
   V("shutdown", bare_tls_shutdown);

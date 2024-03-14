@@ -1,7 +1,6 @@
 /* global Bare */
 const { Duplex } = require('streamx')
 const binding = require('./binding')
-const errors = require('./lib/errors')
 
 const DEFAULT_READ_BUFFER = 65536
 
@@ -12,6 +11,7 @@ const context = binding.initContext()
 exports.Socket = class TLSSocket extends Duplex {
   constructor (socket, opts = {}) {
     const {
+      isServer = false,
       cert = null,
       key = null,
       allowHalfOpen = true,
@@ -31,82 +31,14 @@ exports.Socket = class TLSSocket extends Duplex {
     this._cert = cert
     this._allowHalfOpen = allowHalfOpen
 
-    this._handle = binding.init(context, this, this._onread, this._onwrite)
-
-    if (cert) binding.useCertificate(this._handle, cert)
-    if (key) binding.useKey(this._handle, key)
+    this._handle = binding.init(context, isServer, cert, key, this,
+      this._onread,
+      this._onwrite
+    )
   }
 
   get socket () {
     return this._socket
-  }
-
-  connect () {
-    if (this._state & constants.state.ACCEPT) {
-      throw errors.ALREADY_ACCEPTED('Socket is already accepting connections')
-    }
-
-    if (this._state & constants.state.CONNECT) {
-      throw errors.ALREADY_ACCEPTED('Socket is already connected')
-    }
-
-    binding.connect(this._handle)
-
-    this._state |= constants.state.CONNECT
-  }
-
-  accept () {
-    if (this._state & constants.state.ACCEPT) {
-      throw errors.ALREADY_ACCEPTED('Socket is already accepting connections')
-    }
-
-    if (this._state & constants.state.CONNECT) {
-      throw errors.ALREADY_ACCEPTED('Socket is already connected')
-    }
-
-    binding.accept(this._handle)
-
-    this._state |= constants.state.ACCEPT
-  }
-
-  _continueOpen () {
-    const done = binding.handshake(this._handle)
-
-    if (done) {
-      this._state |= constants.state.HANDSHAKE
-
-      const cb = this._pendingOpen
-      this._pendingOpen = null
-      cb(null)
-    }
-
-    return done
-  }
-
-  _open (cb) {
-    this._pendingOpen = cb
-
-    this._socket.on('data', (data) => this._ondata(data))
-
-    this._continueOpen()
-  }
-
-  _write (data, cb) {
-    binding.write(this._handle, data)
-
-    cb(null)
-  }
-
-  _final (cb) {
-    binding.shutdown(this._handle)
-
-    cb(null)
-  }
-
-  _destroy (cb) {
-    binding.destroy(this._handle)
-
-    cb(null)
   }
 
   _ondata (data) {
@@ -122,8 +54,12 @@ exports.Socket = class TLSSocket extends Duplex {
       }
 
       this.push(this._buffer.subarray(0, length))
-    } else {
-      this._continueOpen()
+    } else if (binding.handshake(this._handle)) {
+      this._state |= constants.state.HANDSHAKE
+
+      const cb = this._pendingOpen
+      this._pendingOpen = null
+      cb(null)
     }
   }
 
@@ -151,6 +87,32 @@ exports.Socket = class TLSSocket extends Duplex {
     this._socket.write(Buffer.from(data))
 
     return data.byteLength
+  }
+
+  _open (cb) {
+    this._socket.on('data', this._ondata.bind(this))
+
+    if (binding.handshake(this._handle)) return cb(null)
+
+    this._pendingOpen = cb
+  }
+
+  _write (data, cb) {
+    binding.write(this._handle, data)
+
+    cb(null)
+  }
+
+  _final (cb) {
+    binding.shutdown(this._handle)
+
+    cb(null)
+  }
+
+  _destroy (cb) {
+    binding.destroy(this._handle)
+
+    cb(null)
   }
 }
 
