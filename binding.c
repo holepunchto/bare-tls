@@ -371,13 +371,13 @@ bare_tls_read (js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
 
   err = tls_read(socket->handle, buffer, (int) len);
-  if (err < 0 && err != tls_retry) {
+  if (err < 0 && err != tls_eof) {
     js_throw_error(env, NULL, "TLS error");
     return NULL;
   }
 
   js_value_t *result;
-  err = js_create_uint32(env, (int) err == tls_retry ? 0 : err, &result);
+  err = js_create_uint32(env, (int) err == tls_eof ? 0 : err, &result);
   assert(err == 0);
 
   return result;
@@ -405,13 +405,13 @@ bare_tls_write (js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
 
   err = tls_write(socket->handle, buffer, (int) len);
-  if (err < 0 && err != tls_retry) {
+  if (err < 0) {
     js_throw_error(env, NULL, "TLS error");
     return NULL;
   }
 
   js_value_t *result;
-  err = js_create_uint32(env, (int) err == tls_retry ? 0 : err, &result);
+  err = js_create_uint32(env, err, &result);
   assert(err == 0);
 
   return result;

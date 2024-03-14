@@ -30,11 +30,14 @@ test('server + client', async (t) => {
   client.connect()
 
   const l = t.test('write + read')
-  l.plan(1)
+  l.plan(2)
 
-  server.on('data', (data) => l.alike(data, Buffer.from('hello')))
+  server
+    .on('data', (data) => l.alike(data, Buffer.from('hello')))
+    .on('close', () => l.pass('closed'))
+    .end()
 
-  client.write('hello')
+  client.end('hello')
 
   await l
 
