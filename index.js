@@ -35,6 +35,8 @@ exports.Socket = class TLSSocket extends Duplex {
       this._onread,
       this._onwrite
     )
+
+    TLSSocket._sockets.add(this)
   }
 
   get socket () {
@@ -65,14 +67,11 @@ exports.Socket = class TLSSocket extends Duplex {
 
   _onread (data) {
     let buffer = this._reading
-
     if (buffer === null) return 0
 
     if (buffer.byteLength > data.byteLength) {
       const rest = buffer.subarray(data.byteLength)
-
       buffer = buffer.subarray(0, data.byteLength)
-
       this._reading = rest
     } else {
       this._reading = null
@@ -91,33 +90,37 @@ exports.Socket = class TLSSocket extends Duplex {
 
   _open (cb) {
     this._socket.on('data', this._ondata.bind(this))
-
     if (binding.handshake(this._handle)) return cb(null)
-
     this._pendingOpen = cb
   }
 
   _write (data, cb) {
     binding.write(this._handle, data)
-
     cb(null)
   }
 
   _final (cb) {
     binding.shutdown(this._handle)
-
     cb(null)
   }
 
   _destroy (cb) {
     binding.destroy(this._handle)
-
+    TLSSocket._sockets.delete(this)
     cb(null)
   }
+
+  static _sockets = new Set()
 }
 
 function mapWritable (data) {
   return typeof data === 'string' ? Buffer.from(data) : data
 }
 
-Bare.on('exit', () => binding.destroyContext(context))
+Bare.on('exit', () => {
+  for (const socket of exports.Socket._sockets) {
+    socket.destroy()
+  }
+
+  binding.destroyContext(context)
+})
