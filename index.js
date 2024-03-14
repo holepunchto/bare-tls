@@ -12,9 +12,10 @@ const context = binding.initContext()
 exports.Socket = class TLSSocket extends Duplex {
   constructor (socket, opts = {}) {
     const {
-      readBufferSize = DEFAULT_READ_BUFFER,
       cert = null,
-      key = null
+      key = null,
+      allowHalfOpen = true,
+      readBufferSize = DEFAULT_READ_BUFFER
     } = opts
 
     super({ mapWritable })
@@ -28,6 +29,7 @@ exports.Socket = class TLSSocket extends Duplex {
     this._socket = socket
     this._key = key
     this._cert = cert
+    this._allowHalfOpen = allowHalfOpen
 
     this._handle = binding.init(context, this, this._onread, this._onwrite)
 
@@ -115,8 +117,13 @@ exports.Socket = class TLSSocket extends Duplex {
     if (this._state & constants.state.HANDSHAKE) {
       const length = binding.read(this._handle, this._buffer)
 
-      if (length) this.push(this._buffer.subarray(0, length))
-      else this.push(null)
+      if (length === 0) {
+        this.push(null)
+        if (this._allowHalfOpen === false) this.end()
+        return
+      }
+
+      this.push(this._buffer.subarray(0, length))
     } else {
       this._continueHandshake()
     }
