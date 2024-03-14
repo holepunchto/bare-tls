@@ -20,11 +20,11 @@ exports.Socket = class TLSSocket extends Duplex {
 
     super({ mapWritable })
 
-    this._pendingRead = null
-    this._pendingWrite = null
+    this._pendingOpen = null
 
     this._state = 0
     this._buffer = Buffer.alloc(readBufferSize)
+    this._reading = null
 
     this._socket = socket
     this._key = key
@@ -69,90 +69,32 @@ exports.Socket = class TLSSocket extends Duplex {
     this._state |= constants.state.ACCEPT
   }
 
-  handshake () {
-    if (this._state & constants.state.HANDSHAKE) return true
-
-    return this._continueHandshake()
-  }
-
-  _open (cb) {
-    this._socket.on('data', (data) => this._ondata(data))
-
-    cb(null)
-  }
-
-  _continueHandshake () {
+  _continueOpen () {
     const done = binding.handshake(this._handle)
 
     if (done) {
       this._state |= constants.state.HANDSHAKE
-      this._continueWrite()
+
+      const cb = this._pendingOpen
+      this._pendingOpen = null
+      cb(null)
     }
 
     return done
   }
 
-  _continueWrite () {
-    const write = this._pendingWrite
+  _open (cb) {
+    this._pendingOpen = cb
 
-    if (write) {
-      this._pendingWrite = null
-      this._write(...write)
-    }
+    this._socket.on('data', (data) => this._ondata(data))
+
+    this._continueOpen()
   }
 
   _write (data, cb) {
-    if (this._state & constants.state.HANDSHAKE) {
-      binding.write(this._handle, data)
-      cb(null)
-    } else {
-      this._pendingWrite = [data, cb]
-      this._continueHandshake()
-    }
-  }
+    binding.write(this._handle, data)
 
-  _ondata (data) {
-    this._pendingRead = data
-
-    if (this._state & constants.state.HANDSHAKE) {
-      const length = binding.read(this._handle, this._buffer)
-
-      if (length === 0) {
-        this.push(null)
-        if (this._allowHalfOpen === false) this.end()
-        return
-      }
-
-      this.push(this._buffer.subarray(0, length))
-    } else {
-      this._continueHandshake()
-    }
-  }
-
-  _onread (data) {
-    let buffer = this._pendingRead
-
-    if (buffer === null) return 0
-
-    if (buffer.byteLength > data.byteLength) {
-      const rest = buffer.subarray(data.byteLength)
-
-      buffer = buffer.subarray(0, data.byteLength)
-
-      this._pendingRead = rest
-    } else {
-      this._pendingRead = null
-    }
-
-    data.set(buffer)
-
-    return buffer.byteLength
-  }
-
-  _onwrite (data) {
-    this._socket.write(Buffer.from(data))
-
-    return data.byteLength
+    cb(null)
   }
 
   _final (cb) {
@@ -165,6 +107,50 @@ exports.Socket = class TLSSocket extends Duplex {
     binding.destroy(this._handle)
 
     cb(null)
+  }
+
+  _ondata (data) {
+    this._reading = data
+
+    if (this._state & constants.state.HANDSHAKE) {
+      const length = binding.read(this._handle, this._buffer)
+
+      if (length === 0) {
+        this.push(null)
+        if (this._allowHalfOpen === false) this.end()
+        return
+      }
+
+      this.push(this._buffer.subarray(0, length))
+    } else {
+      this._continueOpen()
+    }
+  }
+
+  _onread (data) {
+    let buffer = this._reading
+
+    if (buffer === null) return 0
+
+    if (buffer.byteLength > data.byteLength) {
+      const rest = buffer.subarray(data.byteLength)
+
+      buffer = buffer.subarray(0, data.byteLength)
+
+      this._reading = rest
+    } else {
+      this._reading = null
+    }
+
+    data.set(buffer)
+
+    return buffer.byteLength
+  }
+
+  _onwrite (data) {
+    this._socket.write(Buffer.from(data))
+
+    return data.byteLength
   }
 }
 
