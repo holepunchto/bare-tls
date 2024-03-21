@@ -4,6 +4,7 @@
   "description": "Transport Layer Security (TLS) streams for JavaScript",
   "exports": {
     ".": "./index.js",
+    "./package": "./package.json",
     "./constants": "./lib/constants.js",
     "./errors": "./lib/errors.js"
   },
