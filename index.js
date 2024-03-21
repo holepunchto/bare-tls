@@ -44,6 +44,10 @@ exports.Socket = class TLSSocket extends Duplex {
     return this._socket
   }
 
+  get encrypted () {
+    return true
+  }
+
   _onconnect () {
     this._state |= constants.state.HANDSHAKE
 
@@ -140,6 +144,8 @@ exports.Socket = class TLSSocket extends Duplex {
 
   static _sockets = new Set()
 }
+
+exports.TLSSocket = exports.Socket // For Node.js compatibility
 
 function mapWritable (data) {
   return typeof data === 'string' ? Buffer.from(data) : data
