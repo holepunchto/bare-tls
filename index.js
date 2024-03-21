@@ -14,11 +14,12 @@ exports.Socket = class TLSSocket extends Duplex {
       isServer = false,
       cert = null,
       key = null,
+      eagerOpen = true,
       allowHalfOpen = true,
       readBufferSize = DEFAULT_READ_BUFFER
     } = opts
 
-    super({ mapWritable })
+    super({ mapWritable, eagerOpen })
 
     this._pendingOpen = null
 
@@ -43,6 +44,16 @@ exports.Socket = class TLSSocket extends Duplex {
     return this._socket
   }
 
+  _onconnect () {
+    this._state |= constants.state.HANDSHAKE
+
+    this.emit('connect')
+
+    const cb = this._pendingOpen
+    this._pendingOpen = null
+    cb(null)
+  }
+
   _ondata (data) {
     this._reading = data
 
@@ -57,11 +68,7 @@ exports.Socket = class TLSSocket extends Duplex {
 
       this.push(this._buffer.subarray(0, length))
     } else if (binding.handshake(this._handle)) {
-      this._state |= constants.state.HANDSHAKE
-
-      const cb = this._pendingOpen
-      this._pendingOpen = null
-      cb(null)
+      this._onconnect()
     }
   }
 
@@ -101,8 +108,8 @@ exports.Socket = class TLSSocket extends Duplex {
       .on('data', this._ondata.bind(this))
       .on('end', this._onend.bind(this))
       .on('close', this._onclose.bind(this))
-    if (binding.handshake(this._handle)) return cb(null)
     this._pendingOpen = cb
+    if (binding.handshake(this._handle)) this._onconnect()
   }
 
   _write (data, cb) {
@@ -116,9 +123,18 @@ exports.Socket = class TLSSocket extends Duplex {
     cb(null)
   }
 
-  _destroy (cb) {
+  _predestroy () {
     binding.destroy(this._handle)
+    this._handle = null
     TLSSocket._sockets.delete(this)
+  }
+
+  _destroy (cb) {
+    if (this._handle) {
+      binding.destroy(this._handle)
+      this._handle = null
+      TLSSocket._sockets.delete(this)
+    }
     cb(null)
   }
 
