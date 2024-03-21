@@ -65,6 +65,14 @@ exports.Socket = class TLSSocket extends Duplex {
     }
   }
 
+  _onend () {
+    this.push(null)
+  }
+
+  _onclose () {
+    this.destroy()
+  }
+
   _onread (data) {
     let buffer = this._reading
     if (buffer === null) return 0
@@ -89,7 +97,10 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _open (cb) {
-    this._socket.on('data', this._ondata.bind(this))
+    this._socket
+      .on('data', this._ondata.bind(this))
+      .on('end', this._onend.bind(this))
+      .on('close', this._onclose.bind(this))
     if (binding.handshake(this._handle)) return cb(null)
     this._pendingOpen = cb
   }
@@ -101,6 +112,7 @@ exports.Socket = class TLSSocket extends Duplex {
 
   _final (cb) {
     binding.shutdown(this._handle)
+    this._socket.end()
     cb(null)
   }
 
