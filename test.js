@@ -4,7 +4,7 @@ const fs = require('bare-fs')
 const tls = require('.')
 
 test('basic', async (t) => {
-  t.plan(3)
+  t.plan(4)
 
   const [a, b] = pipe()
 
@@ -17,13 +17,16 @@ test('basic', async (t) => {
   const client = new tls.Socket(b)
 
   server
-    .on('data', (data) => t.alike(data, Buffer.from('hello')))
+    .on('data', (data) => {
+      t.alike(data, Buffer.from('ping'), 'ping')
+      server.end('pong')
+    })
     .on('close', () => t.pass('server closed'))
-    .end()
 
   client
+    .on('data', (data) => t.alike(data, Buffer.from('pong'), 'pong'))
     .on('close', () => t.pass('client closed'))
-    .end('hello')
+    .end('ping')
 })
 
 test('connect event', async (t) => {
