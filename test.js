@@ -4,6 +4,8 @@ const fs = require('bare-fs')
 const tls = require('.')
 
 test('basic', async (t) => {
+  t.plan(3)
+
   const [a, b] = pipe()
 
   const server = new tls.Socket(a, {
@@ -14,23 +16,19 @@ test('basic', async (t) => {
 
   const client = new tls.Socket(b)
 
-  const l = t.test('write + read')
-  l.plan(2)
-
   server
-    .on('data', (data) => l.alike(data, Buffer.from('hello')))
-    .on('close', () => l.pass('closed'))
+    .on('data', (data) => t.alike(data, Buffer.from('hello')))
+    .on('close', () => t.pass('server closed'))
     .end()
 
-  client.end('hello')
-
-  await l
-
-  server.destroy()
-  client.destroy()
+  client
+    .on('close', () => t.pass('client closed'))
+    .end('hello')
 })
 
 test('connect event', async (t) => {
+  t.plan(4)
+
   const [a, b] = pipe()
 
   const server = new tls.Socket(a, {
@@ -41,16 +39,15 @@ test('connect event', async (t) => {
 
   const client = new tls.Socket(b)
 
-  const l = t.test('handshake')
-  l.plan(2)
+  server
+    .on('connect', () => t.pass('server handshake'))
+    .on('close', () => t.pass('server closed'))
+    .end()
 
-  server.on('connect', () => l.pass('server handshake'))
-  client.on('connect', () => l.pass('client handshake'))
-
-  await l
-
-  server.destroy()
-  client.destroy()
+  client
+    .on('connect', () => t.pass('client handshake'))
+    .on('close', () => t.pass('client closed'))
+    .end()
 })
 
 function pipe () {
