@@ -1,10 +1,10 @@
 /* global Bare */
 const { Duplex } = require('bare-stream')
 const binding = require('./binding')
+const constants = require('./lib/constants')
+const errors = require('./lib/errors')
 
-const DEFAULT_READ_BUFFER = 65536
-
-const constants = exports.constants = require('./lib/constants')
+const defaultReadBufferSize = 65536
 
 const context = binding.initContext()
 
@@ -16,21 +16,22 @@ exports.Socket = class TLSSocket extends Duplex {
       key = null,
       eagerOpen = true,
       allowHalfOpen = true,
-      readBufferSize = DEFAULT_READ_BUFFER
+      readBufferSize = defaultReadBufferSize
     } = opts
 
     super({ mapWritable, eagerOpen })
 
-    this._pendingOpen = null
-
     this._state = 0
-    this._buffer = Buffer.alloc(readBufferSize)
-    this._reading = null
 
     this._socket = socket
     this._key = key
     this._cert = cert
     this._allowHalfOpen = allowHalfOpen
+
+    this._pendingRead = null
+    this._pendingOpen = null
+
+    this._buffer = Buffer.alloc(readBufferSize)
 
     this._handle = binding.init(context, isServer, cert, key, this,
       this._onread,
@@ -59,7 +60,7 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _ondata (data) {
-    this._reading = data
+    this._pendingRead = data
 
     if (this._state & constants.state.HANDSHAKE) {
       const length = binding.read(this._handle, this._buffer)
@@ -85,15 +86,15 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onread (data) {
-    let buffer = this._reading
+    let buffer = this._pendingRead
     if (buffer === null) return 0
 
     if (buffer.byteLength > data.byteLength) {
       const rest = buffer.subarray(data.byteLength)
       buffer = buffer.subarray(0, data.byteLength)
-      this._reading = rest
+      this._pendingRead = rest
     } else {
-      this._reading = null
+      this._pendingRead = null
     }
 
     data.set(buffer)
@@ -146,6 +147,9 @@ exports.Socket = class TLSSocket extends Duplex {
 }
 
 exports.TLSSocket = exports.Socket // For Node.js compatibility
+
+exports.constants = constants
+exports.errors = errors
 
 function mapWritable (data) {
   return typeof data === 'string' ? Buffer.from(data) : data
