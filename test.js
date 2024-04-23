@@ -1,5 +1,5 @@
 const test = require('brittle')
-const { Duplex } = require('streamx')
+const { Duplex } = require('bare-stream')
 const fs = require('bare-fs')
 const tls = require('.')
 

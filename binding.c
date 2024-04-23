@@ -381,7 +381,7 @@ bare_tls_shutdown (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-init (js_env_t *env, js_value_t *exports) {
+bare_tls_exports (js_env_t *env, js_value_t *exports) {
   int err;
 
 #define V(name, fn) \
@@ -407,4 +407,4 @@ init (js_env_t *env, js_value_t *exports) {
   return exports;
 }
 
-BARE_MODULE(bare_tls, init)
+BARE_MODULE(bare_tls, bare_tls_exports)

@@ -1,5 +1,5 @@
 /* global Bare */
-const { Duplex } = require('streamx')
+const { Duplex } = require('bare-stream')
 const binding = require('./binding')
 
 const DEFAULT_READ_BUFFER = 65536
