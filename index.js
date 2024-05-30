@@ -4,19 +4,20 @@ const binding = require('./binding')
 const constants = require('./lib/constants')
 const errors = require('./lib/errors')
 
-const defaultReadBufferSize = 65536
+const readBufferSize = 65536
 
 const context = binding.initContext()
 
 exports.Socket = class TLSSocket extends Duplex {
+  static _buffer = Buffer.alloc(readBufferSize)
+
   constructor (socket, opts = {}) {
     const {
       isServer = false,
       cert = null,
       key = null,
       eagerOpen = true,
-      allowHalfOpen = true,
-      readBufferSize = defaultReadBufferSize
+      allowHalfOpen = true
     } = opts
 
     super({ mapWritable, eagerOpen })
@@ -28,11 +29,10 @@ exports.Socket = class TLSSocket extends Duplex {
     this._cert = cert
     this._allowHalfOpen = allowHalfOpen
 
-    this._pendingRead = null
     this._pendingOpen = null
     this._pendingWrite = null
 
-    this._buffer = Buffer.alloc(readBufferSize)
+    this._buffer = null
 
     this._handle = binding.init(context, isServer, cert, key, this,
       this._onread,
@@ -61,15 +61,15 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _ondata (data) {
-    if (this._pendingRead !== null) {
-      this._pendingRead = Buffer.concat([this._pendingRead, data])
+    if (this._buffer !== null) {
+      this._buffer = Buffer.concat([this._buffer, data])
     } else {
-      this._pendingRead = data
+      this._buffer = data
     }
 
-    while (this._pendingRead !== null) {
+    while (this._buffer !== null) {
       if (this._state & constants.state.HANDSHAKE) {
-        const read = binding.read(this._handle, this._buffer)
+        const read = binding.read(this._handle, TLSSocket._buffer)
 
         if (read < 0) break
 
@@ -80,7 +80,7 @@ exports.Socket = class TLSSocket extends Duplex {
         }
 
         const copy = Buffer.allocUnsafe(read)
-        copy.set(this._buffer.subarray(0, read))
+        copy.set(TLSSocket._buffer.subarray(0, read))
 
         this.push(copy)
       } else if (binding.handshake(this._handle)) {
@@ -106,15 +106,15 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onread (data) {
-    let buffer = this._pendingRead
+    let buffer = this._buffer
     if (buffer === null) return 0
 
     if (buffer.byteLength > data.byteLength) {
       const rest = buffer.subarray(data.byteLength)
       buffer = buffer.subarray(0, data.byteLength)
-      this._pendingRead = rest
+      this._buffer = rest
     } else {
-      this._pendingRead = null
+      this._buffer = null
     }
 
     data.set(buffer)
