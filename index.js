@@ -61,20 +61,33 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _ondata (data) {
-    this._pendingRead = data
+    if (this._pendingRead !== null) {
+      this._pendingRead = Buffer.concat([this._pendingRead, data])
+    } else {
+      this._pendingRead = data
+    }
 
-    if (this._state & constants.state.HANDSHAKE) {
-      const length = binding.read(this._handle, this._buffer)
+    while (this._pendingRead !== null) {
+      if (this._state & constants.state.HANDSHAKE) {
+        const read = binding.read(this._handle, this._buffer)
 
-      if (length === 0) {
-        this.push(null)
-        if (this._allowHalfOpen === false) this.end()
-        return
+        if (read < 0) break
+
+        if (read === 0) {
+          this.push(null)
+          if (this._allowHalfOpen === false) this.end()
+          return
+        }
+
+        const copy = Buffer.allocUnsafe(read)
+        copy.set(this._buffer.subarray(0, read))
+
+        this.push(copy)
+      } else if (binding.handshake(this._handle)) {
+        this._onconnect()
+      } else {
+        break
       }
-
-      this.push(this._buffer.subarray(0, length))
-    } else if (binding.handshake(this._handle)) {
-      this._onconnect()
     }
   }
 
