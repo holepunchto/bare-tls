@@ -30,6 +30,7 @@ exports.Socket = class TLSSocket extends Duplex {
 
     this._pendingRead = null
     this._pendingOpen = null
+    this._pendingWrite = null
 
     this._buffer = Buffer.alloc(readBufferSize)
 
@@ -77,6 +78,12 @@ exports.Socket = class TLSSocket extends Duplex {
     }
   }
 
+  _ondrain () {
+    const cb = this._pendingWrite
+    this._pendingWrite = null
+    if (cb) cb(null)
+  }
+
   _onend () {
     this.push(null)
   }
@@ -103,7 +110,9 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onwrite (data) {
-    this._socket.write(Buffer.from(data))
+    if (this._socket.write(Buffer.from(data))) {
+      this._pendingWrite = null
+    }
 
     return data.byteLength
   }
@@ -111,6 +120,7 @@ exports.Socket = class TLSSocket extends Duplex {
   _open (cb) {
     this._socket
       .on('data', this._ondata.bind(this))
+      .on('drain', this._ondrain.bind(this))
       .on('end', this._onend.bind(this))
       .on('close', this._onclose.bind(this))
     this._pendingOpen = cb
@@ -118,7 +128,9 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _write (data, cb) {
+    this._pendingWrite = cb
     binding.write(this._handle, data)
+    if (this._pendingWrite) return
     cb(null)
   }
 
