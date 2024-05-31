@@ -55,14 +55,14 @@ test('connect event', async (t) => {
 
 function pipe () {
   const a = new Duplex({
-    write (data, cb) {
+    write (data, encoding, cb) {
       b.push(data)
       cb(null)
     }
   })
 
   const b = new Duplex({
-    write (data, cb) {
+    write (data, encoding, cb) {
       a.push(data)
       cb(null)
     }

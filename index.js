@@ -20,7 +20,7 @@ exports.Socket = class TLSSocket extends Duplex {
       allowHalfOpen = true
     } = opts
 
-    super({ mapWritable, eagerOpen })
+    super({ eagerOpen })
 
     this._state = 0
 
@@ -140,7 +140,7 @@ exports.Socket = class TLSSocket extends Duplex {
     if (binding.handshake(this._handle)) this._onconnect()
   }
 
-  _write (data, cb) {
+  _write (data, encoding, cb) {
     this._pendingWrite = cb
     binding.write(this._handle, data)
     if (this._pendingWrite) return
@@ -159,13 +159,13 @@ exports.Socket = class TLSSocket extends Duplex {
     TLSSocket._sockets.delete(this)
   }
 
-  _destroy (cb) {
+  _destroy (err, cb) {
     if (this._handle) {
       binding.destroy(this._handle)
       this._handle = null
       TLSSocket._sockets.delete(this)
     }
-    cb(null)
+    cb(err)
   }
 
   static _sockets = new Set()
@@ -175,10 +175,6 @@ exports.TLSSocket = exports.Socket // For Node.js compatibility
 
 exports.constants = constants
 exports.errors = errors
-
-function mapWritable (data) {
-  return typeof data === 'string' ? Buffer.from(data) : data
-}
 
 Bare.on('exit', () => {
   for (const socket of exports.Socket._sockets) {
