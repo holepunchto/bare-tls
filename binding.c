@@ -1,15 +1,21 @@
 #include <assert.h>
 #include <bare.h>
 #include <js.h>
-#include <js/ffi.h>
-#include <tls.h>
+#include <openssl/base.h>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/ssl.h>
 
 typedef struct {
-  tls_context_t *handle;
+  SSL_CTX *ssl;
+  BIO_METHOD *io;
 } bare_tls_context_t;
 
 typedef struct {
-  tls_t *handle;
+  SSL *ssl;
+  BIO *io;
+  X509 *certificate;
+  EVP_PKEY *key;
 
   js_env_t *env;
   js_ref_t *ctx;
@@ -17,55 +23,13 @@ typedef struct {
   js_ref_t *on_write;
 } bare_tls_t;
 
-static js_value_t *
-bare_tls_init_context (js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  js_value_t *handle;
-
-  bare_tls_context_t *context;
-  err = js_create_arraybuffer(env, sizeof(bare_tls_context_t), (void **) &context, &handle);
-  assert(err == 0);
-
-  err = tls_context_init(&context->handle);
-  if (err < 0) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
-  }
-
-  js_value_t *result;
-  err = js_create_typedarray(env, js_uint8_array, sizeof(*context), handle, 0, &result);
-  assert(err == 0);
-
-  return result;
-}
-
-static js_value_t *
-bare_tls_destroy_context (js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  size_t argc = 1;
-  js_value_t *argv[1];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 1);
-
-  bare_tls_context_t *context;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &context, NULL, NULL, NULL);
-  assert(err == 0);
-
-  tls_context_destroy(context->handle);
-
-  return NULL;
-}
-
 static int
-bare_tls__on_read (tls_t *tls, char *buffer, int len, void *data) {
+bare_tls__on_read (BIO *io, char *buffer, int len) {
+  if (len == 0) return 0;
+
   int err;
 
-  bare_tls_t *socket = (bare_tls_t *) data;
+  bare_tls_t *socket = BIO_get_ex_data(io, 0);
 
   js_env_t *env = socket->env;
 
@@ -94,14 +58,24 @@ bare_tls__on_read (tls_t *tls, char *buffer, int len, void *data) {
   err = js_detach_arraybuffer(env, arraybuffer);
   assert(err == 0);
 
-  return len == 0 ? tls_retry : len;
+  BIO_clear_retry_flags(io);
+
+  if (len == 0) {
+    BIO_set_retry_read(io);
+
+    return -1;
+  }
+
+  return len;
 }
 
 static int
-bare_tls__on_write (tls_t *tls, const char *buffer, int len, void *data) {
+bare_tls__on_write (BIO *io, const char *buffer, int len) {
+  if (len == 0) return 0;
+
   int err;
 
-  bare_tls_t *socket = (bare_tls_t *) data;
+  bare_tls_t *socket = BIO_get_ex_data(io, 0);
 
   js_env_t *env = socket->env;
 
@@ -131,7 +105,88 @@ bare_tls__on_write (tls_t *tls, const char *buffer, int len, void *data) {
   err = js_detach_arraybuffer(env, arraybuffer);
   assert(err == 0);
 
-  return len == 0 ? tls_retry : len;
+  BIO_clear_retry_flags(io);
+
+  if (len == 0) {
+    BIO_set_retry_write(io);
+
+    return -1;
+  }
+
+  return len;
+}
+
+static long
+bare_tls__on_ctrl (BIO *io, int cmd, long argc, void *argv) {
+  switch (cmd) {
+  case BIO_CTRL_FLUSH:
+    return 1;
+
+  default:
+    return 0;
+  }
+}
+
+static js_value_t *
+bare_tls_init_context (js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  js_value_t *handle;
+
+  bare_tls_context_t *context;
+  err = js_create_arraybuffer(env, sizeof(bare_tls_context_t), (void **) &context, &handle);
+  assert(err == 0);
+
+  BIO_METHOD *io = context->io = BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK, "callback");
+
+  if (io == NULL) goto err;
+
+  SSL_CTX *ssl = context->ssl = SSL_CTX_new(TLS_method());
+
+  if (ssl == NULL) {
+    BIO_meth_free(io);
+
+    goto err;
+  }
+
+  BIO_meth_set_read(io, bare_tls__on_read);
+  BIO_meth_set_write(io, bare_tls__on_write);
+  BIO_meth_set_ctrl(io, bare_tls__on_ctrl);
+
+  err = SSL_CTX_set_ex_data(ssl, 0, (void *) context);
+  assert(err == 1);
+
+  err = SSL_CTX_set_min_proto_version(ssl, TLS1_3_VERSION);
+  assert(err == 1);
+
+  return handle;
+
+err:
+  js_throw_error(env, NULL, "TLS error");
+  return NULL;
+}
+
+static js_value_t *
+bare_tls_destroy_context (js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  size_t argc = 1;
+  js_value_t *argv[1];
+
+  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  assert(err == 0);
+
+  assert(argc == 1);
+
+  bare_tls_context_t *context;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
+  assert(err == 0);
+
+  SSL_CTX_free(context->ssl);
+
+  BIO_meth_free(context->io);
+
+  return NULL;
 }
 
 static js_value_t *
@@ -147,7 +202,7 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
   assert(argc == 7);
 
   bare_tls_context_t *context;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &context, NULL, NULL, NULL);
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
   assert(err == 0);
 
   js_value_t *handle;
@@ -156,19 +211,37 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
   err = js_create_arraybuffer(env, sizeof(bare_tls_t), (void **) &socket, &handle);
   assert(err == 0);
 
-  err = tls_init(context->handle, bare_tls__on_read, bare_tls__on_write, (void *) socket, &socket->handle);
-  if (err < 0) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
+  socket->certificate = NULL;
+  socket->key = NULL;
+
+  BIO *io = socket->io = BIO_new(context->io);
+
+  if (io == NULL) goto err;
+
+  SSL *ssl = socket->ssl = SSL_new(context->ssl);
+
+  if (io == NULL) {
+    BIO_free(io);
+
+    goto err;
   }
+
+  err = BIO_set_ex_data(io, 0, (void *) socket);
+  assert(err == 1);
+
+  BIO_set_init(io, true);
+
+  err = SSL_set_ex_data(ssl, 0, (void *) socket);
+  assert(err == 1);
+
+  SSL_set_bio(ssl, io, io);
 
   bool is_server;
   err = js_get_value_bool(env, argv[1], &is_server);
   assert(err == 0);
 
-  if (is_server) err = tls_accept(socket->handle);
-  else err = tls_connect(socket->handle);
-  assert(err == 0);
+  if (is_server) SSL_set_accept_state(ssl);
+  else SSL_set_connect_state(ssl);
 
   bool has_cert;
   err = js_is_typedarray(env, argv[2], &has_cert);
@@ -180,11 +253,27 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
     err = js_get_typedarray_info(env, argv[2], NULL, (void **) &pem, &len, NULL, NULL);
     assert(err == 0);
 
-    err = tls_use_certificate(socket->handle, pem, (int) len);
-    if (err < 0) {
-      tls_destroy(socket->handle);
-      js_throw_error(env, NULL, "TLS error");
-      return NULL;
+    BIO *io = BIO_new(BIO_s_mem());
+    BIO_write(io, pem, (int) len);
+
+    X509 *certificate = socket->certificate = PEM_read_bio_X509(io, NULL, NULL, NULL);
+
+    BIO_free(io);
+
+    if (certificate == NULL) {
+      SSL_free(ssl);
+
+      goto err;
+    }
+
+    err = SSL_use_certificate(ssl, certificate);
+
+    if (err == 0) {
+      SSL_free(ssl);
+
+      X509_free(certificate);
+
+      goto err;
     }
   }
 
@@ -198,17 +287,29 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
     err = js_get_typedarray_info(env, argv[3], NULL, (void **) &pem, &len, NULL, NULL);
     assert(err == 0);
 
-    err = tls_use_key(socket->handle, pem, (int) len);
-    if (err < 0) {
-      tls_destroy(socket->handle);
-      js_throw_error(env, NULL, "TLS error");
-      return NULL;
+    BIO *io = BIO_new(BIO_s_mem());
+    BIO_write(io, pem, (int) len);
+
+    EVP_PKEY *key = socket->key = PEM_read_bio_PrivateKey(io, NULL, NULL, NULL);
+
+    BIO_free(io);
+
+    if (key == NULL) {
+      SSL_free(ssl);
+
+      goto err;
+    }
+
+    int res = SSL_use_PrivateKey(ssl, key);
+
+    if (res == 0) {
+      SSL_free(ssl);
+
+      EVP_PKEY_free(key);
+
+      goto err;
     }
   }
-
-  js_value_t *result;
-  err = js_create_typedarray(env, js_uint8_array, sizeof(*socket), handle, 0, &result);
-  assert(err == 0);
 
   socket->env = env;
 
@@ -221,7 +322,11 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
   err = js_create_reference(env, argv[6], 1, &socket->on_write);
   assert(err == 0);
 
-  return result;
+  return handle;
+
+err:
+  js_throw_error(env, NULL, "TLS error");
+  return NULL;
 }
 
 static js_value_t *
@@ -237,10 +342,14 @@ bare_tls_destroy (js_env_t *env, js_callback_info_t *info) {
   assert(argc == 1);
 
   bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &socket, NULL);
   assert(err == 0);
 
-  tls_destroy(socket->handle);
+  SSL_free(socket->ssl);
+
+  if (socket->certificate) X509_free(socket->certificate);
+
+  if (socket->key) EVP_PKEY_free(socket->key);
 
   err = js_delete_reference(env, socket->on_read);
   assert(err == 0);
@@ -267,17 +376,26 @@ bare_tls_handshake (js_env_t *env, js_callback_info_t *info) {
   assert(argc == 1);
 
   bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &socket, NULL);
   assert(err == 0);
 
-  err = tls_handshake(socket->handle);
-  if (err < 0 && err != tls_retry) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
+  bool done = true;
+
+  err = SSL_do_handshake(socket->ssl);
+
+  if (err <= 0) {
+    err = SSL_get_error(socket->ssl, err);
+
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+      done = false;
+    } else {
+      js_throw_error(env, NULL, "TLS error");
+      return NULL;
+    }
   }
 
   js_value_t *result;
-  err = js_get_boolean(env, err != tls_retry, &result);
+  err = js_get_boolean(env, done, &result);
   assert(err == 0);
 
   return result;
@@ -296,7 +414,7 @@ bare_tls_read (js_env_t *env, js_callback_info_t *info) {
   assert(argc == 2);
 
   bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &socket, NULL);
   assert(err == 0);
 
   char *buffer;
@@ -304,14 +422,29 @@ bare_tls_read (js_env_t *env, js_callback_info_t *info) {
   err = js_get_typedarray_info(env, argv[1], NULL, (void **) &buffer, &len, NULL, NULL);
   assert(err == 0);
 
-  err = tls_read(socket->handle, buffer, (int) len);
-  if (err < 0 && err != tls_retry && err != tls_eof) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
+  bool retry = false;
+  bool eof = false;
+
+  err = SSL_read(socket->ssl, buffer, len);
+
+  if (err <= 0) {
+    err = SSL_get_error(socket->ssl, err);
+
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+      retry = true;
+    } else if (SSL_get_shutdown(socket->ssl)) {
+      eof = true;
+    } else {
+      js_throw_error(env, NULL, "TLS error");
+      return NULL;
+    }
   }
 
+  int res = eof ? 0 : retry ? -1
+                            : err;
+
   js_value_t *result;
-  err = js_create_int64(env, (int) err == tls_eof ? 0 : err, &result);
+  err = js_create_int64(env, res, &result);
   assert(err == 0);
 
   return result;
@@ -330,7 +463,7 @@ bare_tls_write (js_env_t *env, js_callback_info_t *info) {
   assert(argc == 2);
 
   bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &socket, NULL);
   assert(err == 0);
 
   char *buffer;
@@ -338,14 +471,25 @@ bare_tls_write (js_env_t *env, js_callback_info_t *info) {
   err = js_get_typedarray_info(env, argv[1], NULL, (void **) &buffer, &len, NULL, NULL);
   assert(err == 0);
 
-  err = tls_write(socket->handle, buffer, (int) len);
-  if (err < 0 && err != tls_retry) {
-    js_throw_error(env, NULL, "TLS error");
-    return NULL;
+  bool retry = false;
+
+  err = SSL_write(socket->ssl, buffer, len);
+
+  if (err <= 0) {
+    err = SSL_get_error(socket->ssl, err);
+
+    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+      retry = true;
+    } else {
+      js_throw_error(env, NULL, "TLS error");
+      return NULL;
+    }
   }
 
+  int res = retry ? 0 : err;
+
   js_value_t *result;
-  err = js_create_int64(env, err, &result);
+  err = js_create_int64(env, res, &result);
   assert(err == 0);
 
   return result;
@@ -364,17 +508,18 @@ bare_tls_shutdown (js_env_t *env, js_callback_info_t *info) {
   assert(argc == 1);
 
   bare_tls_t *socket;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &socket, NULL, NULL, NULL);
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &socket, NULL);
   assert(err == 0);
 
-  err = tls_shutdown(socket->handle);
-  if (err < 0 && err != tls_retry) {
+  err = SSL_shutdown(socket->ssl);
+
+  if (err < 0) {
     js_throw_error(env, NULL, "TLS error");
     return NULL;
   }
 
   js_value_t *result;
-  err = js_get_boolean(env, err != tls_retry, &result);
+  err = js_get_boolean(env, err == 1, &result);
   assert(err == 0);
 
   return result;

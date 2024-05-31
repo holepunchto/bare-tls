@@ -1,3 +1,4 @@
-[submodule "vendor/libtls"]
-	path = vendor/libtls
-	url = ../../holepunchto/libtls.git
+[submodule "vendor/boringssl"]
+	path = vendor/boringssl
+	url = ../../google/boringssl.git
+	shallow = true

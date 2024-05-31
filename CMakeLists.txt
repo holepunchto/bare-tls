@@ -4,8 +4,18 @@ project(bare_tls C CXX)
 
 include(bare)
 
-if(NOT TARGET tls)
-  add_subdirectory(vendor/libtls EXCLUDE_FROM_ALL)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+if(NOT TARGET ssl)
+  if(MSVC)
+    set(OPENSSL_NO_ASM ON)
+  endif()
+
+  if(WIN32)
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
+  endif()
+
+  add_subdirectory(vendor/boringssl EXCLUDE_FROM_ALL)
 endif()
 
 add_bare_module(bare_tls)
@@ -19,5 +29,5 @@ target_sources(
 target_link_libraries(
   ${bare_tls}
   PUBLIC
-    tls_static
+    ssl
 )
