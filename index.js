@@ -16,6 +16,7 @@ exports.Socket = class TLSSocket extends Duplex {
       isServer = false,
       cert = null,
       key = null,
+      host = null,
       eagerOpen = true,
       allowHalfOpen = true
     } = opts
@@ -34,7 +35,7 @@ exports.Socket = class TLSSocket extends Duplex {
 
     this._buffer = null
 
-    this._handle = binding.init(context, isServer, cert, key, this,
+    this._handle = binding.init(context, isServer, cert, key, host, this,
       this._onread,
       this._onwrite
     )

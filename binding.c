@@ -194,13 +194,13 @@ static js_value_t *
 bare_tls_init (js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 7;
-  js_value_t *argv[7];
+  size_t argc = 8;
+  js_value_t *argv[8];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 7);
+  assert(argc == 8);
 
   bare_tls_context_t *context;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
@@ -312,15 +312,36 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
     }
   }
 
+  bool has_host;
+  err = js_is_string(env, argv[4], &has_host);
+  assert(err == 0);
+
+  if (has_host) {
+    size_t len;
+    err = js_get_value_string_utf8(env, argv[4], NULL, 0, &len);
+    assert(err == 0);
+
+    len += 1 /* NULL */;
+
+    utf8_t *host = malloc(len);
+    err = js_get_value_string_utf8(env, argv[4], host, len, NULL);
+    assert(err == 0);
+
+    err = SSL_set_tlsext_host_name(ssl, (char *) host);
+    assert(err == 1);
+
+    free(host);
+  }
+
   socket->env = env;
 
-  err = js_create_reference(env, argv[4], 1, &socket->ctx);
+  err = js_create_reference(env, argv[5], 1, &socket->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[5], 1, &socket->on_read);
+  err = js_create_reference(env, argv[6], 1, &socket->on_read);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[6], 1, &socket->on_write);
+  err = js_create_reference(env, argv[7], 1, &socket->on_write);
   assert(err == 0);
 
   return handle;
