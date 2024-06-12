@@ -3,6 +3,7 @@
 #include <js.h>
 #include <openssl/base.h>
 #include <openssl/bio.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
 
@@ -162,7 +163,7 @@ bare_tls_init_context (js_env_t *env, js_callback_info_t *info) {
   return handle;
 
 err:
-  js_throw_error(env, NULL, "TLS error");
+  js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Context initialisation failed");
   return NULL;
 }
 
@@ -325,7 +326,7 @@ bare_tls_init (js_env_t *env, js_callback_info_t *info) {
   return handle;
 
 err:
-  js_throw_error(env, NULL, "TLS error");
+  js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Socket initialisation failed");
   return NULL;
 }
 
@@ -389,7 +390,7 @@ bare_tls_handshake (js_env_t *env, js_callback_info_t *info) {
     if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
       done = false;
     } else {
-      js_throw_error(env, NULL, "TLS error");
+      js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Handshake failed");
       return NULL;
     }
   }
@@ -435,7 +436,7 @@ bare_tls_read (js_env_t *env, js_callback_info_t *info) {
     } else if (SSL_get_shutdown(socket->ssl)) {
       eof = true;
     } else {
-      js_throw_error(env, NULL, "TLS error");
+      js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Read failed");
       return NULL;
     }
   }
@@ -481,7 +482,7 @@ bare_tls_write (js_env_t *env, js_callback_info_t *info) {
     if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
       retry = true;
     } else {
-      js_throw_error(env, NULL, "TLS error");
+      js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Write failed");
       return NULL;
     }
   }
@@ -514,7 +515,7 @@ bare_tls_shutdown (js_env_t *env, js_callback_info_t *info) {
   err = SSL_shutdown(socket->ssl);
 
   if (err < 0) {
-    js_throw_error(env, NULL, "TLS error");
+    js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Shutdown failed");
     return NULL;
   }
 

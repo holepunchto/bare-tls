@@ -69,7 +69,12 @@ exports.Socket = class TLSSocket extends Duplex {
 
     while (this._buffer !== null) {
       if (this._state & constants.state.HANDSHAKE) {
-        const read = binding.read(this._handle, TLSSocket._buffer)
+        let read
+        try {
+          read = binding.read(this._handle, TLSSocket._buffer)
+        } catch (err) {
+          return this.destroy(errors.from(err))
+        }
 
         if (read < 0) break
 
@@ -83,10 +88,16 @@ exports.Socket = class TLSSocket extends Duplex {
         copy.set(TLSSocket._buffer.subarray(0, read))
 
         this.push(copy)
-      } else if (binding.handshake(this._handle)) {
-        this._onconnect()
       } else {
-        break
+        try {
+          if (binding.handshake(this._handle)) this._onconnect()
+          else break
+        } catch (err) {
+          err = errors.from(err)
+          if (this._pendingOpen) this._pendingOpen(err)
+          else this.destroy(err)
+          return
+        }
       }
     }
   }
@@ -123,34 +134,57 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onwrite (data) {
-    if (this._socket.write(Buffer.from(data))) {
-      this._pendingWrite = null
-    }
+    data = Buffer.from(data)
+
+    if (this._socket.write(data)) this._pendingWrite = null
 
     return data.byteLength
   }
 
   _open (cb) {
+    this._pendingOpen = cb
+
     this._socket
       .on('data', this._ondata.bind(this))
       .on('drain', this._ondrain.bind(this))
       .on('end', this._onend.bind(this))
       .on('close', this._onclose.bind(this))
-    this._pendingOpen = cb
-    if (binding.handshake(this._handle)) this._onconnect()
+
+    try {
+      if (binding.handshake(this._handle)) this._onconnect()
+    } catch (err) {
+      this._pendingOpen = null
+
+      cb(errors.from(err))
+    }
   }
 
   _write (data, encoding, cb) {
     this._pendingWrite = cb
-    binding.write(this._handle, data)
-    if (this._pendingWrite) return
-    cb(null)
+
+    try {
+      binding.write(this._handle, data)
+
+      if (this._pendingWrite !== null) return
+
+      cb(null)
+    } catch (err) {
+      this._pendingWrite = null
+
+      cb(errors.from(err))
+    }
   }
 
   _final (cb) {
-    binding.shutdown(this._handle)
+    try {
+      binding.shutdown(this._handle)
+
+      cb(null)
+    } catch (err) {
+      cb(err)
+    }
+
     this._socket.end()
-    cb(null)
   }
 
   _predestroy () {
