@@ -93,9 +93,8 @@ exports.Socket = class TLSSocket extends Duplex {
           if (binding.handshake(this._handle)) this._onconnect()
           else break
         } catch (err) {
-          err = errors.from(err)
-          if (this._pendingOpen) this._pendingOpen(err)
-          else this.destroy(err)
+          if (this._pendingOpen) this._pendingOpen(errors.from(err))
+          else this.destroy(errors.from(err))
           return
         }
       }
