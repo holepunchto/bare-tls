@@ -7,6 +7,10 @@ set(CMAKE_MACOSX_BUNDLE OFF)
 project(bare_tls C CXX)
 
 if(NOT TARGET ssl)
+  if(WIN32)
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
+  endif()
+
   add_subdirectory(vendor/boringssl EXCLUDE_FROM_ALL)
 endif()
 
