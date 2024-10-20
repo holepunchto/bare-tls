@@ -4,16 +4,14 @@ find_package(cmake-bare REQUIRED PATHS node_modules/cmake-bare)
 
 set(CMAKE_MACOSX_BUNDLE OFF)
 
-project(bare_tls C CXX)
+project(bare_tls C)
 
 bare_target(target)
 
 if(target MATCHES "win32")
-  add_definitions(-DWIN32_LEAN_AND_MEAN)
-endif()
-
-if(target MATCHES "win32-x64")
   set(OPENSSL_NO_ASM ON)
+
+  add_definitions(-DWIN32_LEAN_AND_MEAN)
 else()
   enable_language(ASM)
 endif()
