@@ -14,8 +14,7 @@
     "binding.js",
     "CMakeLists.txt",
     "lib",
-    "prebuilds",
-    "vendor/boringssl"
+    "prebuilds"
   ],
   "addon": true,
   "scripts": {
@@ -38,6 +37,7 @@
     "bare-fs": "^3.0.0",
     "brittle": "^3.1.1",
     "cmake-bare": "^1.1.6",
+    "cmake-fetch": "^1.0.0",
     "standard": "^17.0.0"
   }
 }
