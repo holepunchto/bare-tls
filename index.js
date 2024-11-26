@@ -11,7 +11,7 @@ const context = binding.initContext()
 exports.Socket = class TLSSocket extends Duplex {
   static _buffer = Buffer.alloc(readBufferSize)
 
-  constructor (socket, opts = {}) {
+  constructor(socket, opts = {}) {
     const {
       isServer = false,
       cert = null,
@@ -35,7 +35,13 @@ exports.Socket = class TLSSocket extends Duplex {
 
     this._buffer = null
 
-    this._handle = binding.init(context, isServer, cert, key, host, this,
+    this._handle = binding.init(
+      context,
+      isServer,
+      cert,
+      key,
+      host,
+      this,
       this._onread,
       this._onwrite
     )
@@ -43,15 +49,15 @@ exports.Socket = class TLSSocket extends Duplex {
     TLSSocket._sockets.add(this)
   }
 
-  get socket () {
+  get socket() {
     return this._socket
   }
 
-  get encrypted () {
+  get encrypted() {
     return true
   }
 
-  _onconnect () {
+  _onconnect() {
     this._state |= constants.state.HANDSHAKE
 
     this.emit('connect')
@@ -61,7 +67,7 @@ exports.Socket = class TLSSocket extends Duplex {
     cb(null)
   }
 
-  _ondata (data) {
+  _ondata(data) {
     if (this._buffer !== null) {
       this._buffer = Buffer.concat([this._buffer, data])
     } else {
@@ -102,21 +108,21 @@ exports.Socket = class TLSSocket extends Duplex {
     }
   }
 
-  _ondrain () {
+  _ondrain() {
     const cb = this._pendingWrite
     this._pendingWrite = null
     if (cb) cb(null)
   }
 
-  _onend () {
+  _onend() {
     this.push(null)
   }
 
-  _onclose () {
+  _onclose() {
     this.destroy()
   }
 
-  _onread (data) {
+  _onread(data) {
     let buffer = this._buffer
     if (buffer === null) return 0
 
@@ -133,7 +139,7 @@ exports.Socket = class TLSSocket extends Duplex {
     return buffer.byteLength
   }
 
-  _onwrite (data) {
+  _onwrite(data) {
     data = Buffer.from(data)
 
     if (this._socket.write(data)) this._pendingWrite = null
@@ -141,7 +147,7 @@ exports.Socket = class TLSSocket extends Duplex {
     return data.byteLength
   }
 
-  _open (cb) {
+  _open(cb) {
     this._pendingOpen = cb
 
     this._socket
@@ -159,7 +165,7 @@ exports.Socket = class TLSSocket extends Duplex {
     }
   }
 
-  _write (data, encoding, cb) {
+  _write(data, encoding, cb) {
     this._pendingWrite = cb
 
     try {
@@ -175,7 +181,7 @@ exports.Socket = class TLSSocket extends Duplex {
     }
   }
 
-  _final (cb) {
+  _final(cb) {
     try {
       binding.shutdown(this._handle)
 
@@ -187,13 +193,13 @@ exports.Socket = class TLSSocket extends Duplex {
     this._socket.end()
   }
 
-  _predestroy () {
+  _predestroy() {
     binding.destroy(this._handle)
     this._handle = null
     TLSSocket._sockets.delete(this)
   }
 
-  _destroy (err, cb) {
+  _destroy(err, cb) {
     if (this._handle) {
       binding.destroy(this._handle)
       this._handle = null

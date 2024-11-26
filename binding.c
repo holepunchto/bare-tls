@@ -25,7 +25,7 @@ typedef struct {
 } bare_tls_t;
 
 static int
-bare_tls__on_read (BIO *io, char *buffer, int len) {
+bare_tls__on_read(BIO *io, char *buffer, int len) {
   if (len == 0) return 0;
 
   int err;
@@ -71,7 +71,7 @@ bare_tls__on_read (BIO *io, char *buffer, int len) {
 }
 
 static int
-bare_tls__on_write (BIO *io, const char *buffer, int len) {
+bare_tls__on_write(BIO *io, const char *buffer, int len) {
   if (len == 0) return 0;
 
   int err;
@@ -118,7 +118,7 @@ bare_tls__on_write (BIO *io, const char *buffer, int len) {
 }
 
 static long
-bare_tls__on_ctrl (BIO *io, int cmd, long argc, void *argv) {
+bare_tls__on_ctrl(BIO *io, int cmd, long argc, void *argv) {
   switch (cmd) {
   case BIO_CTRL_FLUSH:
     return 1;
@@ -129,7 +129,7 @@ bare_tls__on_ctrl (BIO *io, int cmd, long argc, void *argv) {
 }
 
 static js_value_t *
-bare_tls_init_context (js_env_t *env, js_callback_info_t *info) {
+bare_tls_init_context(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   js_value_t *handle;
@@ -168,7 +168,7 @@ err:
 }
 
 static js_value_t *
-bare_tls_destroy_context (js_env_t *env, js_callback_info_t *info) {
+bare_tls_destroy_context(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 1;
@@ -191,7 +191,7 @@ bare_tls_destroy_context (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_tls_init (js_env_t *env, js_callback_info_t *info) {
+bare_tls_init(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 8;
@@ -352,7 +352,7 @@ err:
 }
 
 static js_value_t *
-bare_tls_destroy (js_env_t *env, js_callback_info_t *info) {
+bare_tls_destroy(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 1;
@@ -386,7 +386,7 @@ bare_tls_destroy (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_tls_handshake (js_env_t *env, js_callback_info_t *info) {
+bare_tls_handshake(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 1;
@@ -424,7 +424,7 @@ bare_tls_handshake (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_tls_read (js_env_t *env, js_callback_info_t *info) {
+bare_tls_read(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 2;
@@ -473,7 +473,7 @@ bare_tls_read (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_tls_write (js_env_t *env, js_callback_info_t *info) {
+bare_tls_write(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 2;
@@ -518,7 +518,7 @@ bare_tls_write (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_tls_shutdown (js_env_t *env, js_callback_info_t *info) {
+bare_tls_shutdown(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   size_t argc = 1;
@@ -548,7 +548,7 @@ bare_tls_shutdown (js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
-bare_tls_exports (js_env_t *env, js_value_t *exports) {
+bare_tls_exports(js_env_t *env, js_value_t *exports) {
   int err;
 
 #define V(name, fn) \
