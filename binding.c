@@ -10,6 +10,9 @@
 typedef struct {
   SSL_CTX *ssl;
   BIO_METHOD *io;
+
+  js_env_t *env;
+  js_ref_t *ctx;
 } bare_tls_context_t;
 
 typedef struct {
@@ -128,8 +131,24 @@ bare_tls__on_ctrl(BIO *io, int cmd, long argc, void *argv) {
   }
 }
 
+static void
+bare_tls__on_teardown(void *data) {
+  int err;
+
+  bare_tls_context_t *context = (bare_tls_context_t *) data;
+
+  js_env_t *env = context->env;
+
+  SSL_CTX_free(context->ssl);
+
+  BIO_meth_free(context->io);
+
+  err = js_delete_reference(env, context->ctx);
+  assert(err == 0);
+}
+
 static js_value_t *
-bare_tls_init_context(js_env_t *env, js_callback_info_t *info) {
+bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   int err;
 
   js_value_t *handle;
@@ -160,33 +179,18 @@ bare_tls_init_context(js_env_t *env, js_callback_info_t *info) {
   err = SSL_CTX_set_min_proto_version(ssl, TLS1_3_VERSION);
   assert(err == 1);
 
+  context->env = env;
+
+  err = js_add_teardown_callback(env, bare_tls__on_teardown, (void *) context);
+  assert(err == 0);
+
+  err = js_create_reference(env, handle, 1, &context->ctx);
+  assert(err == 0);
+
   return handle;
 
 err:
   js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Context initialisation failed");
-  return NULL;
-}
-
-static js_value_t *
-bare_tls_destroy_context(js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  size_t argc = 1;
-  js_value_t *argv[1];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 1);
-
-  bare_tls_context_t *context;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
-  assert(err == 0);
-
-  SSL_CTX_free(context->ssl);
-
-  BIO_meth_free(context->io);
-
   return NULL;
 }
 
@@ -560,9 +564,7 @@ bare_tls_exports(js_env_t *env, js_value_t *exports) {
     assert(err == 0); \
   }
 
-  V("initContext", bare_tls_init_context);
-  V("destroyContext", bare_tls_destroy_context);
-
+  V("context", bare_tls_context);
   V("init", bare_tls_init);
   V("destroy", bare_tls_destroy);
   V("handshake", bare_tls_handshake);

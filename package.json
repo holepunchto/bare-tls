@@ -1,6 +1,6 @@
 {
   "name": "bare-tls",
-  "version": "1.2.1",
+  "version": "2.0.0-0",
   "description": "Transport Layer Security (TLS) streams for JavaScript",
   "exports": {
     ".": "./index.js",
@@ -30,6 +30,9 @@
     "url": "https://github.com/holepunchto/bare-tls/issues"
   },
   "homepage": "https://github.com/holepunchto/bare-tls#readme",
+  "engines": {
+    "bare": ">=1.7.0"
+  },
   "dependencies": {
     "bare-stream": "^2.0.0"
   },

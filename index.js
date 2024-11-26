@@ -6,7 +6,7 @@ const errors = require('./lib/errors')
 
 const readBufferSize = 65536
 
-const context = binding.initContext()
+const context = binding.context()
 
 exports.Socket = class TLSSocket extends Duplex {
   static _buffer = Buffer.alloc(readBufferSize)
@@ -45,8 +45,6 @@ exports.Socket = class TLSSocket extends Duplex {
       this._onread,
       this._onwrite
     )
-
-    TLSSocket._sockets.add(this)
   }
 
   get socket() {
@@ -196,30 +194,18 @@ exports.Socket = class TLSSocket extends Duplex {
   _predestroy() {
     binding.destroy(this._handle)
     this._handle = null
-    TLSSocket._sockets.delete(this)
   }
 
   _destroy(err, cb) {
     if (this._handle) {
       binding.destroy(this._handle)
       this._handle = null
-      TLSSocket._sockets.delete(this)
     }
     cb(err)
   }
-
-  static _sockets = new Set()
 }
 
 exports.TLSSocket = exports.Socket // For Node.js compatibility
 
 exports.constants = constants
 exports.errors = errors
-
-Bare.on('exit', () => {
-  for (const socket of exports.Socket._sockets) {
-    socket.destroy()
-  }
-
-  binding.destroyContext(context)
-})
