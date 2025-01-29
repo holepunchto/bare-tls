@@ -1,4 +1,6 @@
 import { Duplex, DuplexEvents } from 'bare-stream'
+import constants from './lib/constants'
+import errors from './lib/errors'
 
 interface TLSSocketEvents extends DuplexEvents {
   connect: []
@@ -22,15 +24,11 @@ declare class TLSSocket<M extends TLSSocketEvents> extends Duplex<M> {
   constructor(socket: Duplex, opts?: TLSSocketOptions)
 }
 
-declare class TLSError extends Error {
-  static from(err: Error): TLSError
-}
-
-declare const constants: { state: { HANDSHAKE: number } }
-
 export {
+  type TLSSocketEvents,
+  type TLSSocketOptions,
   TLSSocket as Socket,
   TLSSocket as TLSSocket,
-  TLSError as errors,
+  errors,
   constants
 }
