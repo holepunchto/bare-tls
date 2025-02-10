@@ -17,12 +17,13 @@ export interface TLSSocketOptions {
   key?: ArrayBufferView
 }
 
-export interface TLSSocket<M extends TLSSocketEvents> extends Duplex<M> {
+export interface TLSSocket<M extends TLSSocketEvents = TLSSocketEvents>
+  extends Duplex<M> {
   readonly socket: Duplex
   readonly encrypted: true
 }
 
-export class TLSSocket<M extends TLSSocketEvents> extends Duplex<M> {
+export class TLSSocket {
   constructor(socket: Duplex, opts?: TLSSocketOptions)
 }
 
