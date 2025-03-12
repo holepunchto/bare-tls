@@ -41,7 +41,7 @@ bare_tls__on_read(BIO *io, char *buffer, int len) {
   err = js_create_external_arraybuffer(env, (void *) buffer, len, NULL, NULL, &arraybuffer);
 
   js_value_t *typedarray;
-  err = js_create_typedarray(env, js_uint8_array, len, arraybuffer, 0, &typedarray);
+  err = js_create_typedarray(env, js_uint8array, len, arraybuffer, 0, &typedarray);
   assert(err == 0);
 
   js_value_t *ctx;
@@ -88,7 +88,7 @@ bare_tls__on_write(BIO *io, const char *buffer, int len) {
   assert(err == 0);
 
   js_value_t *typedarray;
-  err = js_create_typedarray(env, js_uint8_array, len, arraybuffer, 0, &typedarray);
+  err = js_create_typedarray(env, js_uint8array, len, arraybuffer, 0, &typedarray);
   assert(err == 0);
 
   js_value_t *ctx;
