@@ -6,6 +6,7 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
+#include <stddef.h>
 
 typedef struct {
   SSL_CTX *ssl;
