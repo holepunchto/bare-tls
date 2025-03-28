@@ -47,7 +47,7 @@
     "bare-stream": "^2.6.4"
   },
   "devDependencies": {
-    "bare-fs": "^3.0.0",
+    "bare-fs": "^4.0.2",
     "brittle": "^3.1.1",
     "cmake-bare": "^1.1.6",
     "cmake-fetch": "^1.0.0",
