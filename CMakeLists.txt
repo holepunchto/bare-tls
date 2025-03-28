@@ -3,8 +3,7 @@ cmake_minimum_required(VERSION 3.31)
 find_package(cmake-bare REQUIRED PATHS node_modules/cmake-bare)
 find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_MACOSX_BUNDLE OFF)
+set(BUILD_SHARED_LIBS OFF)
 
 project(bare_tls C CXX)
 
