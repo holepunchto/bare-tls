@@ -6,12 +6,18 @@ find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_BUNDLE OFF)
 
-project(bare_tls C CXX ASM)
+project(bare_tls C CXX)
 
 bare_target(target)
 
 if(target MATCHES "win32")
   add_definitions(-DWIN32_LEAN_AND_MEAN)
+endif()
+
+if(target MATCHES "win32-x64")
+  enable_language(ASM_NASM)
+else()
+  enable_language(ASM)
 endif()
 
 fetch_package("github:google/boringssl#0.20250311.0")
