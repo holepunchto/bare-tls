@@ -5,6 +5,7 @@ find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_MACOSX_BUNDLE OFF)
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT $<$<CONFIG:Debug,RelWithDebInfo>:Embedded>)
 
 project(bare_tls C CXX)
 
