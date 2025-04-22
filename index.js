@@ -1,4 +1,3 @@
-/* global Bare */
 const { Duplex } = require('bare-stream')
 const binding = require('./binding')
 const constants = require('./lib/constants')
@@ -116,8 +115,8 @@ exports.Socket = class TLSSocket extends Duplex {
     this.push(null)
   }
 
-  _onclose() {
-    this.destroy()
+  _onerror(err) {
+    this.destroy(err)
   }
 
   _onread(data) {
@@ -152,7 +151,7 @@ exports.Socket = class TLSSocket extends Duplex {
       .on('data', this._ondata.bind(this))
       .on('drain', this._ondrain.bind(this))
       .on('end', this._onend.bind(this))
-      .on('close', this._onclose.bind(this))
+      .on('error', this._onerror.bind(this))
 
     try {
       if (binding.handshake(this._handle)) this._onconnect()
