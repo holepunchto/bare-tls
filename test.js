@@ -53,6 +53,56 @@ test('connect event', async (t) => {
     .end()
 })
 
+test('destroy server socket', async (t) => {
+  t.plan(4)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b)
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      a.destroy(new Error('abort'))
+    })
+    .on('error', () => t.pass('server errored'))
+    .on('close', () => t.pass('server closed'))
+    .end()
+
+  client.on('connect', () => t.pass('client handshake')).end()
+})
+
+test('destroy client socket', async (t) => {
+  t.plan(3)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b)
+
+  server.end()
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+      b.destroy(new Error('abort'))
+    })
+    .on('error', () => t.pass('client errored'))
+    .on('close', () => t.pass('client closed'))
+    .end()
+})
+
 function pipe() {
   const a = new Duplex({
     write(data, encoding, cb) {
