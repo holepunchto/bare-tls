@@ -1,4 +1,5 @@
 const test = require('brittle')
+const { once } = require('bare-events')
 const { Duplex } = require('bare-stream')
 const fs = require('bare-fs')
 const tls = require('.')
@@ -101,6 +102,41 @@ test('destroy client socket', async (t) => {
     .on('error', () => t.pass('client errored'))
     .on('close', () => t.pass('client closed'))
     .end()
+})
+
+test('net server + client', async (t) => {
+  t.plan(5)
+
+  const server = tls.createServer(
+    {
+      cert: fs.readFileSync('test/fixtures/cert.crt'),
+      key: fs.readFileSync('test/fixtures/cert.key')
+    },
+    (socket) => {
+      socket
+        .on('data', (data) => {
+          t.alike(data, Buffer.from('ping'), 'ping')
+          socket.end('pong')
+        })
+        .on('close', () => t.pass('server closed'))
+    }
+  )
+
+  server.listen()
+
+  await once(server, 'listening')
+
+  const client = tls.connect(server.address())
+
+  client
+    .on('data', (data) => t.alike(data, Buffer.from('pong'), 'pong'))
+    .on('close', () => {
+      t.pass('client closed')
+      server.close(() => {
+        t.pass('server stopped')
+      })
+    })
+    .end('ping')
 })
 
 function pipe() {

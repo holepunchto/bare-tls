@@ -208,3 +208,11 @@ exports.TLSSocket = exports.Socket // For Node.js compatibility
 
 exports.constants = constants
 exports.errors = errors
+
+const net = require('./net')
+
+exports.createConnection = net.createConnection
+exports.createServer = net.createServer
+
+// For Node.js compatibility
+exports.connect = exports.createConnection

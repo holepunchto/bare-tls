@@ -20,6 +20,7 @@
   "files": [
     "index.js",
     "index.d.ts",
+    "net.js",
     "binding.c",
     "binding.js",
     "CMakeLists.txt",
@@ -44,9 +45,11 @@
     "bare": ">=1.7.0"
   },
   "dependencies": {
+    "bare-net": "^2.0.1",
     "bare-stream": "^2.6.4"
   },
   "devDependencies": {
+    "bare-events": "^2.6.0",
     "bare-fs": "^4.0.2",
     "brittle": "^3.1.1",
     "cmake-bare": "^1.1.6",
