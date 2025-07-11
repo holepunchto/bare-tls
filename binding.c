@@ -177,7 +177,7 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   err = SSL_CTX_set_ex_data(ssl, 0, (void *) context);
   assert(err == 1);
 
-  err = SSL_CTX_set_min_proto_version(ssl, TLS1_3_VERSION);
+  err = SSL_CTX_set_min_proto_version(ssl, TLS1_2_VERSION);
   assert(err == 1);
 
   context->env = env;
