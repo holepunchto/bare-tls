@@ -144,14 +144,30 @@ exports.Socket = class TLSSocket extends Duplex {
     return data.byteLength
   }
 
-  _open(cb) {
-    this._pendingOpen = cb
+  _attach() {
+    this._ondata = this._ondata.bind(this)
+    this._ondrain = this._ondrain.bind(this)
+    this._onend = this._onend.bind(this)
+    this._onerror = this._onerror.bind(this)
 
     this._socket
-      .on('data', this._ondata.bind(this))
-      .on('drain', this._ondrain.bind(this))
-      .on('end', this._onend.bind(this))
-      .on('error', this._onerror.bind(this))
+      .on('data', this._ondata)
+      .on('drain', this._ondrain)
+      .on('end', this._onend)
+      .on('error', this._onerror)
+  }
+
+  _detach() {
+    this._socket
+      .off('data', this._ondata)
+      .off('drain', this._ondrain)
+      .off('end', this._onend)
+      .off('error', this._onerror)
+  }
+
+  _open(cb) {
+    this._pendingOpen = cb
+    this._attach()
 
     try {
       if (binding.handshake(this._handle)) this._onconnect()
@@ -191,11 +207,13 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _predestroy() {
+    this._detach()
     binding.destroy(this._handle)
     this._handle = null
   }
 
   _destroy(err, cb) {
+    this._detach()
     if (this._handle) {
       binding.destroy(this._handle)
       this._handle = null

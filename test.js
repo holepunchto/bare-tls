@@ -54,7 +54,7 @@ test('connect event', async (t) => {
     .end()
 })
 
-test('destroy server socket', async (t) => {
+test('destroy server socket on connect', async (t) => {
   t.plan(4)
 
   const [a, b] = pipe()
@@ -79,7 +79,7 @@ test('destroy server socket', async (t) => {
   client.on('connect', () => t.pass('client handshake')).end()
 })
 
-test('destroy client socket', async (t) => {
+test('destroy client socket on connect', async (t) => {
   t.plan(3)
 
   const [a, b] = pipe()
@@ -102,6 +102,33 @@ test('destroy client socket', async (t) => {
     .on('error', () => t.pass('client errored'))
     .on('close', () => t.pass('client closed'))
     .end()
+})
+
+test('destroy client on data', async (t) => {
+  t.plan(3)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b)
+
+  server.write('First')
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+    })
+    .on('data', () => {
+      client.destroy(new Error('abort'))
+      server.write('Second')
+    })
+    .on('error', () => t.pass('client errored'))
+    .on('close', () => t.pass('client closed'))
 })
 
 test('net server + client', async (t) => {
