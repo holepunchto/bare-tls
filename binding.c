@@ -34,6 +34,8 @@ bare_tls__on_read(BIO *io, char *buffer, int len) {
 
   int err;
 
+  BIO_clear_retry_flags(io);
+
   bare_tls_t *socket = BIO_get_ex_data(io, 0);
 
   js_env_t *env = socket->env;
@@ -55,15 +57,13 @@ bare_tls__on_read(BIO *io, char *buffer, int len) {
 
   js_value_t *result;
   err = js_call_function(env, ctx, on_read, 1, &typedarray, &result);
-  assert(err == 0);
+  if (err < 0) return -1;
 
   err = js_get_value_int32(env, result, &len);
   assert(err == 0);
 
   err = js_detach_arraybuffer(env, arraybuffer);
   assert(err == 0);
-
-  BIO_clear_retry_flags(io);
 
   if (len == 0) {
     BIO_set_retry_read(io);
@@ -79,6 +79,8 @@ bare_tls__on_write(BIO *io, const char *buffer, int len) {
   if (len == 0) return 0;
 
   int err;
+
+  BIO_clear_retry_flags(io);
 
   bare_tls_t *socket = BIO_get_ex_data(io, 0);
 
@@ -102,15 +104,13 @@ bare_tls__on_write(BIO *io, const char *buffer, int len) {
 
   js_value_t *result;
   err = js_call_function(env, ctx, on_write, 1, &typedarray, &result);
-  assert(err == 0);
+  if (err < 0) return -1;
 
   err = js_get_value_int32(env, result, &len);
   assert(err == 0);
 
   err = js_detach_arraybuffer(env, arraybuffer);
   assert(err == 0);
-
-  BIO_clear_retry_flags(io);
 
   if (len == 0) {
     BIO_set_retry_write(io);
