@@ -32,7 +32,8 @@ exports.Socket = class TLSSocket extends Duplex {
     this._pendingOpen = null
     this._pendingWrite = null
 
-    this._buffer = null
+    this._buffer = []
+    this._buffered = 0
 
     this._handle = binding.init(
       context,
@@ -65,13 +66,10 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _ondata(data) {
-    if (this._buffer !== null) {
-      this._buffer = Buffer.concat([this._buffer, data])
-    } else {
-      this._buffer = data
-    }
+    this._buffer.push(data)
+    this._buffered += data.byteLength
 
-    while (this._buffer !== null) {
+    while (this._buffered > 0) {
       if (this._state & constants.state.HANDSHAKE) {
         let read
         try {
@@ -120,26 +118,21 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onread(data) {
-    let buffer = this._buffer
-    if (buffer === null) return 0
+    if (this._buffered < data.byteLength) return 0
 
-    if (buffer.byteLength > data.byteLength) {
-      const rest = buffer.subarray(data.byteLength)
-      buffer = buffer.subarray(0, data.byteLength)
-      this._buffer = rest
-    } else {
-      this._buffer = null
-    }
+    const buffer =
+      this._buffer.length === 1 ? this._buffer[0] : Buffer.concat(this._buffer)
 
-    data.set(buffer)
+    data.set(buffer.subarray(0, data.byteLength))
 
-    return buffer.byteLength
+    this._buffered -= data.byteLength
+    this._buffer = this._buffered > 0 ? [buffer.subarray(data.byteLength)] : []
+
+    return data.byteLength
   }
 
   _onwrite(data) {
-    data = Buffer.from(data)
-
-    if (this._socket.write(data)) this._pendingWrite = null
+    if (this._socket.write(Buffer.from(data))) this._pendingWrite = null
 
     return data.byteLength
   }
