@@ -132,7 +132,7 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onwrite(data) {
-    if (this._socket.write(Buffer.from(data))) this._pendingWrite = null
+    if (this._socket.write(Buffer.from(data.slice()))) this._pendingWrite = null
 
     return data.byteLength
   }
