@@ -114,7 +114,14 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onerror(err) {
-    this.destroy(err)
+    if (this._pendingOpen) {
+      const cb = this._pendingOpen
+      this._pendingOpen = null
+
+      cb(err)
+    } else {
+      this.destroy(err)
+    }
   }
 
   _onread(data) {
