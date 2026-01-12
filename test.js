@@ -166,6 +166,38 @@ test('net server + client', async (t) => {
     .end('ping')
 })
 
+test('underlying socket error before handshake', async (t) => {
+  t.plan(2)
+
+  const [a, b] = pipe()
+
+  const client = new tls.Socket(b)
+
+  client
+    .on('error', (err) => t.is(err.message, 'connection failed'))
+    .on('close', () => t.pass('client closed'))
+
+  b.destroy(new Error('connection failed'))
+})
+
+test('underlying socket error before handshake, server', async (t) => {
+  t.plan(2)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  server
+    .on('error', (err) => t.is(err.message, 'connection failed'))
+    .on('close', () => t.pass('server closed'))
+
+  a.destroy(new Error('connection failed'))
+})
+
 function pipe() {
   const a = new Duplex({
     write(data, encoding, cb) {
