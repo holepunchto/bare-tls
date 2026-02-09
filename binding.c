@@ -22,6 +22,9 @@ typedef struct {
   X509 *certificate;
   EVP_PKEY *key;
 
+  uint8_t *alpn;
+  size_t alpn_len;
+
   js_env_t *env;
   js_ref_t *ctx;
   js_ref_t *on_read;
@@ -133,6 +136,21 @@ bare_tls__on_ctrl(BIO *io, int cmd, long argc, void *argv) {
   }
 }
 
+static int
+bare_tls__on_alpn_select(SSL *ssl, const uint8_t **out, uint8_t *outlen, const uint8_t *in, unsigned int inlen, void *arg) {
+  bare_tls_t *socket = (bare_tls_t *) SSL_get_ex_data(ssl, 0);
+
+  if (socket == NULL || socket->alpn == NULL || socket->alpn_len == 0) {
+    return SSL_TLSEXT_ERR_NOACK;
+  }
+
+  if (SSL_select_next_proto((uint8_t **) out, outlen, socket->alpn, (unsigned int) socket->alpn_len, in, inlen) != OPENSSL_NPN_NEGOTIATED) {
+    return SSL_TLSEXT_ERR_NOACK;
+  }
+
+  return SSL_TLSEXT_ERR_OK;
+}
+
 static void
 bare_tls__on_teardown(void *data) {
   int err;
@@ -181,6 +199,8 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   err = SSL_CTX_set_min_proto_version(ssl, TLS1_2_VERSION);
   assert(err == 1);
 
+  SSL_CTX_set_alpn_select_cb(ssl, bare_tls__on_alpn_select, NULL);
+
   context->env = env;
 
   err = js_add_teardown_callback(env, bare_tls__on_teardown, (void *) context);
@@ -200,13 +220,13 @@ static js_value_t *
 bare_tls_init(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 8;
-  js_value_t *argv[8];
+  size_t argc = 9;
+  js_value_t *argv[9];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 8);
+  assert(argc >= 8);
 
   bare_tls_context_t *context;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
@@ -220,6 +240,8 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
 
   socket->certificate = NULL;
   socket->key = NULL;
+  socket->alpn = NULL;
+  socket->alpn_len = 0;
 
   BIO *io = socket->io = BIO_new(context->io);
 
@@ -227,7 +249,7 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
 
   SSL *ssl = socket->ssl = SSL_new(context->ssl);
 
-  if (io == NULL) {
+  if (ssl == NULL) {
     BIO_free(io);
 
     goto err;
@@ -339,6 +361,36 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     free(host);
   }
 
+  if (argc >= 9) {
+    bool has_alpn;
+    err = js_is_typedarray(env, argv[8], &has_alpn);
+    assert(err == 0);
+
+    if (has_alpn) {
+      uint8_t *alpn_data;
+      size_t alpn_len;
+      err = js_get_typedarray_info(env, argv[8], NULL, (void **) &alpn_data, &alpn_len, NULL, NULL);
+      assert(err == 0);
+
+      if (is_server) {
+        uint8_t *copy = malloc(alpn_len);
+
+        if (copy == NULL) {
+          SSL_free(ssl);
+          goto err;
+        }
+
+        memcpy(copy, alpn_data, alpn_len);
+
+        socket->alpn = copy;
+        socket->alpn_len = alpn_len;
+      } else {
+        err = SSL_set_alpn_protos(ssl, alpn_data, alpn_len);
+        assert(err == 0);
+      }
+    }
+  }
+
   socket->env = env;
 
   err = js_create_reference(env, argv[5], 1, &socket->ctx);
@@ -378,6 +430,8 @@ bare_tls_destroy(js_env_t *env, js_callback_info_t *info) {
   if (socket->certificate) X509_free(socket->certificate);
 
   if (socket->key) EVP_PKEY_free(socket->key);
+
+  if (socket->alpn) free(socket->alpn);
 
   err = js_delete_reference(env, socket->on_read);
   assert(err == 0);
@@ -554,6 +608,42 @@ bare_tls_shutdown(js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
+bare_tls_alpn_protocol(js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  size_t argc = 1;
+  js_value_t *argv[1];
+
+  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  assert(err == 0);
+
+  assert(argc == 1);
+
+  bare_tls_t *socket;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &socket, NULL);
+  assert(err == 0);
+
+  const uint8_t *data = NULL;
+  unsigned int len = 0;
+
+  SSL_get0_alpn_selected(socket->ssl, &data, &len);
+
+  if (data == NULL || len == 0) {
+    js_value_t *result;
+    err = js_get_null(env, &result);
+    assert(err == 0);
+
+    return result;
+  }
+
+  js_value_t *result;
+  err = js_create_string_utf8(env, data, len, &result);
+  assert(err == 0);
+
+  return result;
+}
+
+static js_value_t *
 bare_tls_exports(js_env_t *env, js_value_t *exports) {
   int err;
 
@@ -573,6 +663,7 @@ bare_tls_exports(js_env_t *env, js_value_t *exports) {
   V("read", bare_tls_read);
   V("write", bare_tls_write);
   V("shutdown", bare_tls_shutdown);
+  V("alpnProtocol", bare_tls_alpn_protocol);
 #undef V
 
   return exports;

@@ -198,6 +198,198 @@ test('underlying socket error before handshake, server', async (t) => {
   a.destroy(new Error('connection failed'))
 })
 
+test('alpn negotiation - h2', async (t) => {
+  t.plan(6)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key'),
+    alpnProtocols: ['h2', 'http/1.1']
+  })
+
+  const client = new tls.Socket(b, {
+    alpnProtocols: ['h2', 'http/1.1']
+  })
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      t.is(server.alpnProtocol, 'h2', 'server negotiated h2')
+    })
+    .on('close', () => t.pass('server closed'))
+    .end()
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+      t.is(client.alpnProtocol, 'h2', 'client negotiated h2')
+    })
+    .on('close', () => t.pass('client closed'))
+    .end()
+})
+
+test('alpn negotiation - fallback to http/1.1', async (t) => {
+  t.plan(6)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key'),
+    alpnProtocols: ['http/1.1']
+  })
+
+  const client = new tls.Socket(b, {
+    alpnProtocols: ['h2', 'http/1.1']
+  })
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      t.is(server.alpnProtocol, 'http/1.1', 'server negotiated http/1.1')
+    })
+    .on('close', () => t.pass('server closed'))
+    .end()
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+      t.is(client.alpnProtocol, 'http/1.1', 'client negotiated http/1.1')
+    })
+    .on('close', () => t.pass('client closed'))
+    .end()
+})
+
+test('alpn negotiation - no alpn configured', async (t) => {
+  t.plan(6)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b)
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      t.is(server.alpnProtocol, null, 'server alpnProtocol is null')
+    })
+    .on('close', () => t.pass('server closed'))
+    .end()
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+      t.is(client.alpnProtocol, null, 'client alpnProtocol is null')
+    })
+    .on('close', () => t.pass('client closed'))
+    .end()
+})
+
+test('alpn negotiation - no overlap', async (t) => {
+  t.plan(6)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key'),
+    alpnProtocols: ['http/1.1']
+  })
+
+  const client = new tls.Socket(b, {
+    alpnProtocols: ['h2']
+  })
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      t.is(server.alpnProtocol, null, 'server alpnProtocol is null on no overlap')
+    })
+    .on('close', () => t.pass('server closed'))
+    .end()
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+      t.is(client.alpnProtocol, null, 'client alpnProtocol is null on no overlap')
+    })
+    .on('close', () => t.pass('client closed'))
+    .end()
+})
+
+test('alpn negotiation - client only', async (t) => {
+  t.plan(6)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b, {
+    alpnProtocols: ['h2', 'http/1.1']
+  })
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      t.is(server.alpnProtocol, null, 'server alpnProtocol is null')
+    })
+    .on('close', () => t.pass('server closed'))
+    .end()
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+      t.is(client.alpnProtocol, null, 'client alpnProtocol is null')
+    })
+    .on('close', () => t.pass('client closed'))
+    .end()
+})
+
+test('alpn negotiation - server only', async (t) => {
+  t.plan(6)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key'),
+    alpnProtocols: ['h2', 'http/1.1']
+  })
+
+  const client = new tls.Socket(b)
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      t.is(server.alpnProtocol, null, 'server alpnProtocol is null')
+    })
+    .on('close', () => t.pass('server closed'))
+    .end()
+
+  client
+    .on('connect', () => {
+      t.pass('client handshake')
+      t.is(client.alpnProtocol, null, 'client alpnProtocol is null')
+    })
+    .on('close', () => t.pass('client closed'))
+    .end()
+})
+
 function pipe() {
   const a = new Duplex({
     write(data, encoding, cb) {
