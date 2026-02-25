@@ -1,4 +1,4 @@
-const { Duplex } = require('bare-stream')
+const { Duplex, Writable } = require('bare-stream')
 const binding = require('./binding')
 const constants = require('./lib/constants')
 const errors = require('./lib/errors')
@@ -104,9 +104,10 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _ondrain() {
+    if (this._pendingWrite === null) return
     const cb = this._pendingWrite
     this._pendingWrite = null
-    if (cb) cb(null)
+    cb(null)
   }
 
   _onend() {
@@ -117,7 +118,6 @@ exports.Socket = class TLSSocket extends Duplex {
     if (this._pendingOpen) {
       const cb = this._pendingOpen
       this._pendingOpen = null
-
       cb(err)
     } else {
       this.destroy(err)
@@ -139,7 +139,7 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onwrite(data) {
-    if (this._socket.write(Buffer.from(data.slice()))) this._pendingWrite = null
+    this._socket.write(Buffer.from(data.slice()))
 
     return data.byteLength
   }
@@ -185,14 +185,14 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _write(data, encoding, cb) {
-    this._pendingWrite = cb
-
     try {
       binding.write(this._handle, data)
 
-      if (this._pendingWrite !== null) return
-
-      cb(null)
+      if (Writable.isBackpressured(this._socket)) {
+        this._pendingWrite = cb
+      } else {
+        cb(null)
+      }
     } catch (err) {
       this._pendingWrite = null
 
