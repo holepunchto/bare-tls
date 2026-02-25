@@ -227,7 +227,7 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
 
   SSL *ssl = socket->ssl = SSL_new(context->ssl);
 
-  if (io == NULL) {
+  if (ssl == NULL) {
     BIO_free(io);
 
     goto err;
