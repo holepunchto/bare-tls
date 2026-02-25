@@ -145,6 +145,9 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _attach() {
+    if (this._state & constants.state.ATTACHED) return
+    this._state |= constants.state.ATTACHED
+
     this._ondata = this._ondata.bind(this)
     this._ondrain = this._ondrain.bind(this)
     this._onend = this._onend.bind(this)
@@ -158,6 +161,9 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _detach() {
+    if (!(this._state & constants.state.ATTACHED)) return
+    this._state &= ~constants.state.ATTACHED
+
     this._socket
       .off('data', this._ondata)
       .off('drain', this._ondrain)
