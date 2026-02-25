@@ -56,7 +56,7 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onconnect() {
-    this._state |= constants.state.HANDSHAKE
+    this._state |= constants.state.CONNECTED
 
     this.emit('connect')
 
@@ -70,7 +70,7 @@ exports.Socket = class TLSSocket extends Duplex {
     this._buffered += data.byteLength
 
     while (this._buffered > 0) {
-      if (this._state & constants.state.HANDSHAKE) {
+      if (this._state & constants.state.CONNECTED) {
         let read
         try {
           read = binding.read(this._handle, TLSSocket._buffer)
