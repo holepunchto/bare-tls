@@ -132,13 +132,29 @@ exports.Socket = class TLSSocket extends Duplex {
   _onread(data) {
     if (this._buffered < data.byteLength) return 0
 
-    const buffer =
-      this._buffer.length === 1 ? this._buffer[0] : Buffer.concat(this._buffer)
+    let offset = 0
+    let remaining = data.byteLength
 
-    data.set(buffer.subarray(0, data.byteLength))
+    while (remaining > 0) {
+      const chunk = this._buffer[0]
+
+      if (chunk.byteLength <= remaining) {
+        data.set(chunk, offset)
+
+        offset += chunk.byteLength
+        remaining -= chunk.byteLength
+
+        this._buffer.shift()
+      } else {
+        data.set(chunk.subarray(0, remaining), offset)
+
+        this._buffer[0] = chunk.subarray(remaining)
+
+        remaining = 0
+      }
+    }
 
     this._buffered -= data.byteLength
-    this._buffer = this._buffered > 0 ? [buffer.subarray(data.byteLength)] : []
 
     return data.byteLength
   }
