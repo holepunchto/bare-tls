@@ -3,13 +3,11 @@ const binding = require('./binding')
 const constants = require('./lib/constants')
 const errors = require('./lib/errors')
 
-const readBufferSize = 65536
+const defaultReadBufferSize = 65536
 
 const context = binding.context()
 
 exports.Socket = class TLSSocket extends Duplex {
-  static _buffer = Buffer.alloc(readBufferSize)
-
   constructor(socket, opts = {}) {
     const {
       isServer = false,
@@ -17,7 +15,8 @@ exports.Socket = class TLSSocket extends Duplex {
       key = null,
       host = null,
       eagerOpen = true,
-      allowHalfOpen = true
+      allowHalfOpen = true,
+      readBufferSize = defaultReadBufferSize
     } = opts
 
     super({ eagerOpen })
@@ -32,6 +31,7 @@ exports.Socket = class TLSSocket extends Duplex {
     this._pendingOpen = null
     this._pendingWrite = null
 
+    this._reading = Buffer.alloc(readBufferSize)
     this._buffer = []
     this._buffered = 0
 
@@ -73,7 +73,7 @@ exports.Socket = class TLSSocket extends Duplex {
       if (this._state & constants.state.CONNECTED) {
         let read
         try {
-          read = binding.read(this._handle, TLSSocket._buffer)
+          read = binding.read(this._handle, this._reading)
         } catch (err) {
           return this.destroy(errors.from(err))
         }
@@ -87,7 +87,7 @@ exports.Socket = class TLSSocket extends Duplex {
         }
 
         const copy = Buffer.allocUnsafe(read)
-        copy.set(TLSSocket._buffer.subarray(0, read))
+        copy.set(this._reading.subarray(0, read))
 
         this.push(copy)
       } else {
