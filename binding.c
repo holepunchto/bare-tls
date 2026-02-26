@@ -619,17 +619,15 @@ bare_tls_alpn_protocol(js_env_t *env, js_callback_info_t *info) {
 
   SSL_get0_alpn_selected(socket->ssl, &data, &len);
 
-  if (data == NULL || len == 0) {
-    js_value_t *result;
+  js_value_t *result;
+
+  if (data && len) {
+    err = js_create_string_utf8(env, data, len, &result);
+    assert(err == 0);
+  } else {
     err = js_get_null(env, &result);
     assert(err == 0);
-
-    return result;
   }
-
-  js_value_t *result;
-  err = js_create_string_utf8(env, data, len, &result);
-  assert(err == 0);
 
   return result;
 }
