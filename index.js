@@ -14,6 +14,7 @@ exports.Socket = class TLSSocket extends Duplex {
       cert = null,
       key = null,
       host = null,
+      alpnProtocols = null,
       eagerOpen = true,
       allowHalfOpen = true,
       readBufferSize = defaultReadBufferSize
@@ -35,12 +36,31 @@ exports.Socket = class TLSSocket extends Duplex {
     this._buffer = []
     this._buffered = 0
 
+    let alpn = null
+
+    if (alpnProtocols && alpnProtocols.length > 0) {
+      const parts = []
+
+      for (const protocol of alpnProtocols) {
+        const encoded = Buffer.from(protocol)
+
+        if (encoded.byteLength === 0 || encoded.byteLength > 255) {
+          throw new RangeError('ALPN protocol name must be 1-255 bytes')
+        }
+
+        parts.push(Buffer.of(encoded.byteLength), encoded)
+      }
+
+      alpn = Buffer.concat(parts)
+    }
+
     this._handle = binding.init(
       context,
       isServer,
       cert,
       key,
       host,
+      alpn,
       this,
       this._onread,
       this._onwrite
@@ -53,6 +73,10 @@ exports.Socket = class TLSSocket extends Duplex {
 
   get encrypted() {
     return true
+  }
+
+  get alpnProtocol() {
+    return binding.alpnProtocol(this._handle)
   }
 
   _onconnect() {
