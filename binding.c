@@ -368,7 +368,7 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
   if (has_alpn) {
     uint8_t *alpn;
     size_t len;
-    err = js_get_typedarray_info(env, argv[8], NULL, (void **) &alpn, &len, NULL, NULL);
+    err = js_get_typedarray_info(env, argv[5], NULL, (void **) &alpn, &len, NULL, NULL);
     assert(err == 0);
 
     if (is_server) {
