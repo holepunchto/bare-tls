@@ -226,7 +226,7 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc >= 8);
+  assert(argc == 8 || argc == 9);
 
   bare_tls_context_t *context;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
@@ -361,33 +361,27 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     free(host);
   }
 
-  if (argc >= 9) {
-    bool has_alpn;
-    err = js_is_typedarray(env, argv[8], &has_alpn);
+  if (argc == 9) {
+    uint8_t *alpn_data;
+    size_t alpn_len;
+    err = js_get_typedarray_info(env, argv[8], NULL, (void **) &alpn_data, &alpn_len, NULL, NULL);
     assert(err == 0);
 
-    if (has_alpn) {
-      uint8_t *alpn_data;
-      size_t alpn_len;
-      err = js_get_typedarray_info(env, argv[8], NULL, (void **) &alpn_data, &alpn_len, NULL, NULL);
-      assert(err == 0);
+    if (is_server) {
+      uint8_t *copy = malloc(alpn_len);
 
-      if (is_server) {
-        uint8_t *copy = malloc(alpn_len);
-
-        if (copy == NULL) {
-          SSL_free(ssl);
-          goto err;
-        }
-
-        memcpy(copy, alpn_data, alpn_len);
-
-        socket->alpn = copy;
-        socket->alpn_len = alpn_len;
-      } else {
-        err = SSL_set_alpn_protos(ssl, alpn_data, alpn_len);
-        assert(err == 0);
+      if (copy == NULL) {
+        SSL_free(ssl);
+        goto err;
       }
+
+      memcpy(copy, alpn_data, alpn_len);
+
+      socket->alpn = copy;
+      socket->alpn_len = alpn_len;
+    } else {
+      err = SSL_set_alpn_protos(ssl, alpn_data, alpn_len);
+      assert(err == 0);
     }
   }
 
