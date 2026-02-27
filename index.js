@@ -217,6 +217,11 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _open(cb) {
+    if (!this._handle) {
+      this.destroy()
+      return
+    }
+
     this._pendingOpen = cb
     this._attach()
 
@@ -259,8 +264,10 @@ exports.Socket = class TLSSocket extends Duplex {
 
   _predestroy() {
     this._detach()
-    binding.destroy(this._handle)
-    this._handle = null
+    if (this._handle) {
+      binding.destroy(this._handle)
+      this._handle = null
+    }
   }
 
   _destroy(err, cb) {

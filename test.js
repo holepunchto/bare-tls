@@ -398,6 +398,46 @@ test('alpn negotiation - server only', async (t) => {
     .end()
 })
 
+test('invalid key should not crash the process', async (t) => {
+  t.plan(1)
+
+  const [a, b] = pipe()
+
+  try {
+    new tls.Socket(a, {
+      isServer: true,
+      cert: fs.readFileSync('test/fixtures/cert.crt'),
+      key: Buffer.from('not a valid PEM key')
+    })
+    t.fail('should have thrown')
+  } catch (err) {
+    t.pass('threw error: ' + err.message)
+  }
+
+  a.destroy()
+  b.destroy()
+})
+
+test('invalid cert should not crash the process', async (t) => {
+  t.plan(1)
+
+  const [a, b] = pipe()
+
+  try {
+    new tls.Socket(a, {
+      isServer: true,
+      cert: Buffer.from('not a valid PEM cert'),
+      key: fs.readFileSync('test/fixtures/cert.key')
+    })
+    t.fail('should have thrown')
+  } catch (err) {
+    t.pass('threw error: ' + err.message)
+  }
+
+  a.destroy()
+  b.destroy()
+})
+
 function pipe() {
   const a = new Duplex({
     write(data, encoding, cb) {
