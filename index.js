@@ -67,6 +67,8 @@ exports.Socket = class TLSSocket extends Duplex {
         this._onwrite
       )
     } catch (err) {
+      this._handle = null
+
       this.destroy(err)
     }
   }
