@@ -54,17 +54,21 @@ exports.Socket = class TLSSocket extends Duplex {
       alpn = Buffer.concat(parts)
     }
 
-    this._handle = binding.init(
-      context,
-      isServer,
-      cert,
-      key,
-      host,
-      alpn,
-      this,
-      this._onread,
-      this._onwrite
-    )
+    try {
+      this._handle = binding.init(
+        context,
+        isServer,
+        cert,
+        key,
+        host,
+        alpn,
+        this,
+        this._onread,
+        this._onwrite
+      )
+    } catch (err) {
+      this.destroy(err)
+    }
   }
 
   get socket() {
@@ -217,11 +221,6 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _open(cb) {
-    if (!this._handle) {
-      cb(new Error('Destroyed'))
-      return
-    }
-
     this._pendingOpen = cb
     this._attach()
 
@@ -263,19 +262,22 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _predestroy() {
+    if (!this._handle) return
+
     this._detach()
-    if (this._handle) {
-      binding.destroy(this._handle)
-      this._handle = null
-    }
+
+    binding.destroy(this._handle)
+    this._handle = null
   }
 
   _destroy(err, cb) {
+    if (!this._handle) return cb(err)
+
     this._detach()
-    if (this._handle) {
-      binding.destroy(this._handle)
-      this._handle = null
-    }
+
+    binding.destroy(this._handle)
+    this._handle = null
+
     cb(err)
   }
 }
