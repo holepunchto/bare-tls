@@ -415,8 +415,6 @@ test('invalid key should not crash the process', async (t) => {
     })
   } catch {}
 
-  await new Promise((resolve) => setTimeout(resolve, 10))
-
   a.destroy()
   b.destroy()
 })
@@ -437,8 +435,6 @@ test('invalid cert should not crash the process', async (t) => {
       key: fs.readFileSync('test/fixtures/cert.key')
     })
   } catch {}
-
-  await new Promise((resolve) => setTimeout(resolve, 10))
 
   a.destroy()
   b.destroy()
