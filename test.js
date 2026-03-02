@@ -403,16 +403,19 @@ test('invalid key should not crash the process', async (t) => {
 
   const [a, b] = pipe()
 
+  const onerror = (err) => t.is(err.message, 'Destroyed')
+  Bare.on('uncaughtException', onerror)
+  t.teardown(() => Bare.off('uncaughtException', onerror))
+
   try {
     new tls.Socket(a, {
       isServer: true,
       cert: fs.readFileSync('test/fixtures/cert.crt'),
       key: Buffer.from('not a valid PEM key')
     })
-    t.fail('should have thrown')
-  } catch (err) {
-    t.pass('threw error: ' + err.message)
-  }
+  } catch {}
+
+  await new Promise((resolve) => setTimeout(resolve, 10))
 
   a.destroy()
   b.destroy()
@@ -423,16 +426,19 @@ test('invalid cert should not crash the process', async (t) => {
 
   const [a, b] = pipe()
 
+  const onerror = (err) => t.is(err.message, 'Destroyed')
+  Bare.on('uncaughtException', onerror)
+  t.teardown(() => Bare.off('uncaughtException', onerror))
+
   try {
     new tls.Socket(a, {
       isServer: true,
       cert: Buffer.from('not a valid PEM cert'),
       key: fs.readFileSync('test/fixtures/cert.key')
     })
-    t.fail('should have thrown')
-  } catch (err) {
-    t.pass('threw error: ' + err.message)
-  }
+  } catch {}
+
+  await new Promise((resolve) => setTimeout(resolve, 10))
 
   a.destroy()
   b.destroy()

@@ -218,7 +218,7 @@ exports.Socket = class TLSSocket extends Duplex {
 
   _open(cb) {
     if (!this._handle) {
-      this.destroy()
+      cb(new Error('Destroyed'))
       return
     }
 
