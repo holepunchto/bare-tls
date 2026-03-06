@@ -80,10 +80,7 @@ class TLSNetServer extends EventEmitter {
   }
 
   _onconnection(socket) {
-    this.emit(
-      'connection',
-      new TLSNetSocket(socket, { ...this._opts, isServer: true })
-    )
+    this.emit('connection', new TLSNetSocket(socket, { ...this._opts, isServer: true }))
   }
 
   _onerror(err) {

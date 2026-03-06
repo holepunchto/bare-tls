@@ -313,11 +313,7 @@ test('alpn negotiation - no overlap', async (t) => {
   server
     .on('connect', () => {
       t.pass('server handshake')
-      t.is(
-        server.alpnProtocol,
-        null,
-        'server alpnProtocol is null on no overlap'
-      )
+      t.is(server.alpnProtocol, null, 'server alpnProtocol is null on no overlap')
     })
     .on('close', () => t.pass('server closed'))
     .end()
@@ -325,11 +321,7 @@ test('alpn negotiation - no overlap', async (t) => {
   client
     .on('connect', () => {
       t.pass('client handshake')
-      t.is(
-        client.alpnProtocol,
-        null,
-        'client alpnProtocol is null on no overlap'
-      )
+      t.is(client.alpnProtocol, null, 'client alpnProtocol is null on no overlap')
     })
     .on('close', () => t.pass('client closed'))
     .end()
