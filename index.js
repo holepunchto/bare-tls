@@ -22,9 +22,6 @@ exports.Socket = class TLSSocket extends Duplex {
 
     super({ eagerOpen })
 
-    // Catch any errors occurring prior to attaching to the socket
-    socket.on('error', noop)
-
     this._state = 0
 
     this._socket = socket
@@ -38,6 +35,13 @@ exports.Socket = class TLSSocket extends Duplex {
     this._reading = Buffer.alloc(readBufferSize)
     this._buffer = []
     this._buffered = 0
+
+    this._ondata = this._ondata.bind(this)
+    this._ondrain = this._ondrain.bind(this)
+    this._onend = this._onend.bind(this)
+    this._onerror = this._onerror.bind(this)
+
+    socket.on('error', this._onerror)
 
     let alpn = null
 
@@ -201,11 +205,6 @@ exports.Socket = class TLSSocket extends Duplex {
   _attach() {
     if (this._state & constants.state.ATTACHED) return
     this._state |= constants.state.ATTACHED
-
-    this._ondata = this._ondata.bind(this)
-    this._ondrain = this._ondrain.bind(this)
-    this._onend = this._onend.bind(this)
-    this._onerror = this._onerror.bind(this)
 
     this._socket
       .on('data', this._ondata)
