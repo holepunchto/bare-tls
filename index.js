@@ -22,6 +22,9 @@ exports.Socket = class TLSSocket extends Duplex {
 
     super({ eagerOpen })
 
+    // Catch any errors occurring prior to attaching to the socket
+    socket.on('error', noop)
+
     this._state = 0
 
     this._socket = socket
@@ -296,3 +299,5 @@ exports.createServer = net.createServer
 
 // For Node.js compatibility
 exports.connect = exports.createConnection
+
+function noop() {}
