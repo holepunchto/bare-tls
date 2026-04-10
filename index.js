@@ -22,9 +22,9 @@ exports.Socket = class TLSSocket extends Duplex {
 
     super({ eagerOpen })
 
-    // we error handle below, this is just for the inbetwene states
+    // Catch any errors occurring prior to attaching to the socket
     socket.on('error', noop)
-    
+
     this._state = 0
 
     this._socket = socket
