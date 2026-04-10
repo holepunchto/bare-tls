@@ -298,5 +298,3 @@ exports.createServer = net.createServer
 
 // For Node.js compatibility
 exports.connect = exports.createConnection
-
-function noop() {}
