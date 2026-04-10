@@ -31,6 +31,7 @@ exports.Socket = class TLSSocket extends Duplex {
 
     this._pendingOpen = null
     this._pendingWrite = null
+    this._pendingDestroy = null
 
     this._reading = Buffer.alloc(readBufferSize)
     this._buffer = []
@@ -39,9 +40,10 @@ exports.Socket = class TLSSocket extends Duplex {
     this._ondata = this._ondata.bind(this)
     this._ondrain = this._ondrain.bind(this)
     this._onend = this._onend.bind(this)
+    this._onclose = this._onclose.bind(this)
     this._onerror = this._onerror.bind(this)
 
-    socket.on('error', this._onerror)
+    socket.on('close', this._onclose).on('error', this._onerror)
 
     let alpn = null
 
@@ -156,10 +158,24 @@ exports.Socket = class TLSSocket extends Duplex {
     this.push(null)
   }
 
+  _onclose() {
+    this._socket.off('close', this._onclose).off('error', this._onerror)
+
+    if (this._pendingDestroy) {
+      const cb = this._pendingDestroy
+      this._pendingDestroy = null
+      cb()
+    }
+  }
+
   _onerror(err) {
     if (this._pendingOpen) {
       const cb = this._pendingOpen
       this._pendingOpen = null
+      cb(err)
+    } else if (this._pendingDestroy) {
+      const cb = this._pendingDestroy
+      this._pendingDestroy = null
       cb(err)
     } else {
       this.destroy(err)
@@ -206,22 +222,14 @@ exports.Socket = class TLSSocket extends Duplex {
     if (this._state & constants.state.ATTACHED) return
     this._state |= constants.state.ATTACHED
 
-    this._socket
-      .on('data', this._ondata)
-      .on('drain', this._ondrain)
-      .on('end', this._onend)
-      .on('error', this._onerror)
+    this._socket.on('data', this._ondata).on('drain', this._ondrain).on('end', this._onend)
   }
 
   _detach() {
     if (!(this._state & constants.state.ATTACHED)) return
     this._state &= ~constants.state.ATTACHED
 
-    this._socket
-      .off('data', this._ondata)
-      .off('drain', this._ondrain)
-      .off('end', this._onend)
-      .off('error', this._onerror)
+    this._socket.off('data', this._ondata).off('drain', this._ondrain).off('end', this._onend)
   }
 
   _open(cb) {
@@ -266,23 +274,28 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _predestroy() {
-    if (!this._handle) return
+    if (this._handle) {
+      this._detach()
 
-    this._detach()
+      binding.destroy(this._handle)
+      this._handle = null
+    }
 
-    binding.destroy(this._handle)
-    this._handle = null
+    this._socket.destroy()
   }
 
   _destroy(err, cb) {
-    if (!this._handle) return cb(err)
+    if (this._handle) {
+      this._detach()
 
-    this._detach()
+      binding.destroy(this._handle)
+      this._handle = null
+    }
 
-    binding.destroy(this._handle)
-    this._handle = null
+    if (err) this._socket.destroy()
 
-    cb(err)
+    if (this._socket.destroyed) cb(err)
+    else this._pendingDestroy = cb
   }
 }
 

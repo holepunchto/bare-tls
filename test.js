@@ -390,6 +390,111 @@ test('alpn negotiation - server only', async (t) => {
     .end()
 })
 
+test('destroying tls socket destroys underlying socket', async (t) => {
+  t.plan(2)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b)
+
+  b.on('close', () => t.pass('underlying socket closed'))
+
+  client.on('connect', () => client.destroy()).on('close', () => t.pass('client closed'))
+
+  server.end()
+})
+
+test('destroying tls socket waits for underlying socket to close', async (t) => {
+  t.plan(2)
+
+  const a = new Duplex({
+    write(data, encoding, cb) {
+      b.push(data)
+      cb(null)
+    }
+  })
+
+  const b = new Duplex({
+    write(data, encoding, cb) {
+      a.push(data)
+      cb(null)
+    },
+    destroy(err, cb) {
+      setTimeout(cb, 50, err)
+    }
+  })
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b)
+
+  b.on('close', () => {
+    t.pass('underlying socket closed')
+  })
+
+  client
+    .on('connect', () => client.destroy())
+    .on('close', () => {
+      t.pass('client closed')
+    })
+
+  server.end()
+})
+
+test('tls socket forwards errors from underlying socket during destroy', async (t) => {
+  t.plan(2)
+
+  const a = new Duplex({
+    write(data, encoding, cb) {
+      b.push(data)
+      cb(null)
+    },
+    final(cb) {
+      b.push(null)
+      cb(null)
+    }
+  })
+
+  const b = new Duplex({
+    write(data, encoding, cb) {
+      a.push(data)
+      cb(null)
+    },
+    final(cb) {
+      a.push(null)
+      cb(null)
+    },
+    destroy(err, cb) {
+      setTimeout(cb, 10, new Error('boom'))
+    }
+  })
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    key: fs.readFileSync('test/fixtures/cert.key')
+  })
+
+  const client = new tls.Socket(b)
+
+  client
+    .on('error', (err) => t.is(err.message, 'boom', 'underlying error forwarded'))
+    .on('close', () => t.pass('client closed'))
+    .end()
+
+  server.end()
+})
+
 test('invalid key should not crash the process', async (t) => {
   t.plan(1)
 
@@ -433,12 +538,20 @@ function pipe() {
     write(data, encoding, cb) {
       b.push(data)
       cb(null)
+    },
+    final(cb) {
+      b.push(null)
+      cb(null)
     }
   })
 
   const b = new Duplex({
     write(data, encoding, cb) {
       a.push(data)
+      cb(null)
+    },
+    final(cb) {
+      a.push(null)
       cb(null)
     }
   })
