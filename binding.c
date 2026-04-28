@@ -34,7 +34,7 @@ typedef struct {
 
 static int
 bare_tls__on_read(BIO *io, char *buffer, int len) {
-  if (len == 0) return 0;
+  if (len <= 0) return 0;
 
   int err;
 
@@ -81,7 +81,7 @@ bare_tls__on_read(BIO *io, char *buffer, int len) {
 
 static int
 bare_tls__on_write(BIO *io, const char *buffer, int len) {
-  if (len == 0) return 0;
+  if (len <= 0) return 0;
 
   int err;
 
