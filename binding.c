@@ -145,7 +145,7 @@ bare_tls__on_alpn_select(SSL *ssl, const uint8_t **out, uint8_t *outlen, const u
     return SSL_TLSEXT_ERR_NOACK;
   }
 
-  if (SSL_select_next_proto((uint8_t **) out, outlen, socket->alpn, (unsigned int) socket->alpn_len, in, inlen) != OPENSSL_NPN_NEGOTIATED) {
+  if (SSL_select_next_proto((uint8_t **) out, outlen, in, inlen, socket->alpn, (unsigned int) socket->alpn_len) != OPENSSL_NPN_NEGOTIATED) {
     return SSL_TLSEXT_ERR_NOACK;
   }
 
