@@ -15,7 +15,7 @@ test('basic', async (t) => {
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   server
     .on('data', (data) => {
@@ -41,7 +41,7 @@ test('connect event', async (t) => {
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   server
     .on('connect', () => t.pass('server handshake'))
@@ -65,7 +65,7 @@ test('destroy server socket on connect', async (t) => {
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   server
     .on('connect', () => {
@@ -90,7 +90,7 @@ test('destroy client socket on connect', async (t) => {
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   server.end()
 
@@ -115,7 +115,7 @@ test('destroy client on data', async (t) => {
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   server.write('First')
 
@@ -153,7 +153,7 @@ test('net server + client', async (t) => {
 
   await once(server, 'listening')
 
-  const client = tls.connect(server.address())
+  const client = tls.connect({ ...server.address(), rejectUnauthorized: false })
 
   client
     .on('data', (data) => t.alike(data, Buffer.from('pong'), 'pong'))
@@ -211,7 +211,8 @@ test('alpn negotiation - h2', async (t) => {
   })
 
   const client = new tls.Socket(b, {
-    alpnProtocols: ['h2', 'http/1.1']
+    alpnProtocols: ['h2', 'http/1.1'],
+    rejectUnauthorized: false
   })
 
   server
@@ -244,7 +245,8 @@ test('alpn negotiation - fallback to http/1.1', async (t) => {
   })
 
   const client = new tls.Socket(b, {
-    alpnProtocols: ['h2', 'http/1.1']
+    alpnProtocols: ['h2', 'http/1.1'],
+    rejectUnauthorized: false
   })
 
   server
@@ -275,7 +277,7 @@ test('alpn negotiation - no alpn configured', async (t) => {
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   server
     .on('connect', () => {
@@ -307,7 +309,8 @@ test('alpn negotiation - no overlap', async (t) => {
   })
 
   const client = new tls.Socket(b, {
-    alpnProtocols: ['h2']
+    alpnProtocols: ['h2'],
+    rejectUnauthorized: false
   })
 
   server
@@ -339,7 +342,8 @@ test('alpn negotiation - client only', async (t) => {
   })
 
   const client = new tls.Socket(b, {
-    alpnProtocols: ['h2', 'http/1.1']
+    alpnProtocols: ['h2', 'http/1.1'],
+    rejectUnauthorized: false
   })
 
   server
@@ -371,7 +375,7 @@ test('alpn negotiation - server only', async (t) => {
     alpnProtocols: ['h2', 'http/1.1']
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   server
     .on('connect', () => {
@@ -401,7 +405,7 @@ test('destroying tls socket destroys underlying socket', async (t) => {
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   b.on('close', () => t.pass('underlying socket closed'))
 
@@ -436,7 +440,7 @@ test('destroying tls socket waits for underlying socket to close', async (t) => 
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   b.on('close', () => {
     t.pass('underlying socket closed')
@@ -485,7 +489,7 @@ test('tls socket forwards errors from underlying socket during destroy', async (
     key: fs.readFileSync('test/fixtures/cert.key')
   })
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { rejectUnauthorized: false })
 
   client
     .on('error', (err) => t.is(err.message, 'boom', 'underlying error forwarded'))

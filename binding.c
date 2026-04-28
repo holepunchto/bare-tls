@@ -6,6 +6,7 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
+#include <openssl/x509.h>
 #include <stddef.h>
 
 typedef struct {
@@ -199,6 +200,9 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   err = SSL_CTX_set_min_proto_version(ssl, TLS1_2_VERSION);
   assert(err == 1);
 
+  err = SSL_CTX_set_default_verify_paths(ssl);
+  assert(err == 1);
+
   SSL_CTX_set_alpn_select_cb(ssl, bare_tls__on_alpn_select, NULL);
 
   context->env = env;
@@ -220,13 +224,13 @@ static js_value_t *
 bare_tls_init(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 9;
-  js_value_t *argv[9];
+  size_t argc = 10;
+  js_value_t *argv[10];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 9);
+  assert(argc == 10);
 
   bare_tls_context_t *context;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
@@ -269,8 +273,19 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
   err = js_get_value_bool(env, argv[1], &is_server);
   assert(err == 0);
 
-  if (is_server) SSL_set_accept_state(ssl);
-  else SSL_set_connect_state(ssl);
+  bool reject_unauthorized;
+  err = js_get_value_bool(env, argv[5], &reject_unauthorized);
+  assert(err == 0);
+
+  if (is_server) {
+    SSL_set_accept_state(ssl);
+  } else {
+    SSL_set_connect_state(ssl);
+
+    if (reject_unauthorized) {
+      SSL_set_verify(ssl, SSL_VERIFY_PEER, NULL);
+    }
+  }
 
   bool has_cert;
   err = js_is_typedarray(env, argv[2], &has_cert);
@@ -358,17 +373,20 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     err = SSL_set_tlsext_host_name(ssl, (char *) host);
     assert(err == 1);
 
+    X509_VERIFY_PARAM *param = SSL_get0_param(ssl);
+    X509_VERIFY_PARAM_set1_host(param, (char *) host, 0);
+
     free(host);
   }
 
   bool has_alpn;
-  err = js_is_typedarray(env, argv[5], &has_alpn);
+  err = js_is_typedarray(env, argv[6], &has_alpn);
   assert(err == 0);
 
   if (has_alpn) {
     uint8_t *alpn;
     size_t len;
-    err = js_get_typedarray_info(env, argv[5], NULL, (void **) &alpn, &len, NULL, NULL);
+    err = js_get_typedarray_info(env, argv[6], NULL, (void **) &alpn, &len, NULL, NULL);
     assert(err == 0);
 
     if (is_server) {
@@ -384,13 +402,13 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
 
   socket->env = env;
 
-  err = js_create_reference(env, argv[6], 1, &socket->ctx);
+  err = js_create_reference(env, argv[7], 1, &socket->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[7], 1, &socket->on_read);
+  err = js_create_reference(env, argv[8], 1, &socket->on_read);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[8], 1, &socket->on_write);
+  err = js_create_reference(env, argv[9], 1, &socket->on_write);
   assert(err == 0);
 
   return handle;
