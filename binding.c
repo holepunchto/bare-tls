@@ -204,6 +204,8 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   err = SSL_CTX_set_default_verify_paths(ssl);
   assert(err == 1);
 
+  SSL_CTX_set_options(ssl, SSL_OP_NO_TICKET);
+
   SSL_CTX_set_alpn_select_cb(ssl, bare_tls__on_alpn_select, NULL);
 
   context->env = env;
