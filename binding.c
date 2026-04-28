@@ -5,6 +5,7 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/mem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <stddef.h>
@@ -335,6 +336,10 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     BIO_write(io, pem, (int) len);
 
     EVP_PKEY *key = socket->key = PEM_read_bio_PrivateKey(io, NULL, NULL, NULL);
+
+    char *mem_data;
+    long mem_len = BIO_get_mem_data(io, &mem_data);
+    OPENSSL_cleanse(mem_data, mem_len);
 
     BIO_free(io);
 
