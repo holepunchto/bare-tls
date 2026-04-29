@@ -23,6 +23,8 @@ class TLSNetServer extends EventEmitter {
       cert = null,
       key = null,
       host = null,
+      rejectUnauthorized = true,
+      ca = null,
       alpnProtocols = null,
       eagerOpen = true,
       allowHalfOpen = true
@@ -34,6 +36,8 @@ class TLSNetServer extends EventEmitter {
       cert,
       key,
       host,
+      rejectUnauthorized,
+      ca,
       alpnProtocols,
       eagerOpen,
       allowHalfOpen

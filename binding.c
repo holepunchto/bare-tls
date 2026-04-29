@@ -201,9 +201,6 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   err = SSL_CTX_set_min_proto_version(ssl, TLS1_2_VERSION);
   assert(err == 1);
 
-  err = SSL_CTX_set_default_verify_paths(ssl);
-  assert(err == 1);
-
   SSL_CTX_set_options(ssl, SSL_OP_NO_TICKET);
 
   SSL_CTX_set_alpn_select_cb(ssl, bare_tls__on_alpn_select, NULL);
@@ -227,13 +224,13 @@ static js_value_t *
 bare_tls_init(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 10;
-  js_value_t *argv[10];
+  size_t argc = 11;
+  js_value_t *argv[11];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 10);
+  assert(argc == 11);
 
   bare_tls_context_t *context;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &context, NULL);
@@ -386,14 +383,44 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     free(host);
   }
 
+  bool has_ca;
+  err = js_is_typedarray(env, argv[6], &has_ca);
+  assert(err == 0);
+
+  if (has_ca) {
+    char *pem;
+    size_t len;
+    err = js_get_typedarray_info(env, argv[6], NULL, (void **) &pem, &len, NULL, NULL);
+    assert(err == 0);
+
+    BIO *io = BIO_new_mem_buf(pem, (int) len);
+
+    X509_STORE *store = X509_STORE_new();
+
+    X509 *cert;
+    while ((cert = PEM_read_bio_X509(io, NULL, NULL, NULL)) != NULL) {
+      X509_STORE_add_cert(store, cert);
+      X509_free(cert);
+    }
+
+    ERR_clear_error();
+
+    BIO_free(io);
+
+    SSL_set0_verify_cert_store(ssl, store);
+  } else {
+    err = SSL_CTX_set_default_verify_paths(context->ssl);
+    assert(err == 1);
+  }
+
   bool has_alpn;
-  err = js_is_typedarray(env, argv[6], &has_alpn);
+  err = js_is_typedarray(env, argv[7], &has_alpn);
   assert(err == 0);
 
   if (has_alpn) {
     uint8_t *alpn;
     size_t len;
-    err = js_get_typedarray_info(env, argv[6], NULL, (void **) &alpn, &len, NULL, NULL);
+    err = js_get_typedarray_info(env, argv[7], NULL, (void **) &alpn, &len, NULL, NULL);
     assert(err == 0);
 
     if (is_server) {
@@ -409,13 +436,13 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
 
   socket->env = env;
 
-  err = js_create_reference(env, argv[7], 1, &socket->ctx);
+  err = js_create_reference(env, argv[8], 1, &socket->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[8], 1, &socket->on_read);
+  err = js_create_reference(env, argv[9], 1, &socket->on_read);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[9], 1, &socket->on_write);
+  err = js_create_reference(env, argv[10], 1, &socket->on_write);
   assert(err == 0);
 
   return handle;

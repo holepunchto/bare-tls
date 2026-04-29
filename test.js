@@ -4,6 +4,9 @@ const { Duplex } = require('bare-stream')
 const fs = require('bare-fs')
 const tls = require('.')
 
+const cert = fs.readFileSync('test/fixtures/cert.crt')
+const key = fs.readFileSync('test/fixtures/cert.key')
+
 test('basic', async (t) => {
   t.plan(4)
 
@@ -11,11 +14,11 @@ test('basic', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   server
     .on('data', (data) => {
@@ -37,11 +40,11 @@ test('connect event', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   server
     .on('connect', () => t.pass('server handshake'))
@@ -61,11 +64,11 @@ test('destroy server socket on connect', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   server
     .on('connect', () => {
@@ -86,11 +89,11 @@ test('destroy client socket on connect', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   server.end()
 
@@ -111,11 +114,11 @@ test('destroy client on data', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   server.write('First')
 
@@ -136,8 +139,8 @@ test('net server + client', async (t) => {
 
   const server = tls.createServer(
     {
-      cert: fs.readFileSync('test/fixtures/cert.crt'),
-      key: fs.readFileSync('test/fixtures/cert.key')
+      cert,
+      key
     },
     (socket) => {
       socket
@@ -153,7 +156,7 @@ test('net server + client', async (t) => {
 
   await once(server, 'listening')
 
-  const client = tls.connect({ ...server.address(), rejectUnauthorized: false })
+  const client = tls.connect({ ...server.address(), ca: cert })
 
   client
     .on('data', (data) => t.alike(data, Buffer.from('pong'), 'pong'))
@@ -187,8 +190,8 @@ test('underlying socket error before handshake, server', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
   server
@@ -205,14 +208,14 @@ test('alpn negotiation - h2', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key'),
+    cert,
+    key,
     alpnProtocols: ['h2', 'http/1.1']
   })
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2', 'http/1.1'],
-    rejectUnauthorized: false
+    ca: cert
   })
 
   server
@@ -239,14 +242,14 @@ test('alpn negotiation - fallback to http/1.1', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key'),
+    cert,
+    key,
     alpnProtocols: ['http/1.1']
   })
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2', 'http/1.1'],
-    rejectUnauthorized: false
+    ca: cert
   })
 
   server
@@ -273,11 +276,11 @@ test('alpn negotiation - no alpn configured', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   server
     .on('connect', () => {
@@ -303,14 +306,14 @@ test('alpn negotiation - no overlap', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key'),
+    cert,
+    key,
     alpnProtocols: ['http/1.1']
   })
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2'],
-    rejectUnauthorized: false
+    ca: cert
   })
 
   server
@@ -337,13 +340,13 @@ test('alpn negotiation - client only', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2', 'http/1.1'],
-    rejectUnauthorized: false
+    ca: cert
   })
 
   server
@@ -370,12 +373,12 @@ test('alpn negotiation - server only', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key'),
+    cert,
+    key,
     alpnProtocols: ['h2', 'http/1.1']
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   server
     .on('connect', () => {
@@ -401,11 +404,11 @@ test('destroying tls socket destroys underlying socket', async (t) => {
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   b.on('close', () => t.pass('underlying socket closed'))
 
@@ -436,11 +439,11 @@ test('destroying tls socket waits for underlying socket to close', async (t) => 
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   b.on('close', () => {
     t.pass('underlying socket closed')
@@ -485,11 +488,11 @@ test('tls socket forwards errors from underlying socket during destroy', async (
 
   const server = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    cert,
+    key
   })
 
-  const client = new tls.Socket(b, { rejectUnauthorized: false })
+  const client = new tls.Socket(b, { ca: cert })
 
   client
     .on('error', (err) => t.is(err.message, 'boom', 'underlying error forwarded'))
@@ -506,7 +509,7 @@ test('invalid key should not crash the process', async (t) => {
 
   const socket = new tls.Socket(a, {
     isServer: true,
-    cert: fs.readFileSync('test/fixtures/cert.crt'),
+    cert,
     key: Buffer.from('not a valid PEM key')
   })
 
@@ -526,7 +529,7 @@ test('invalid cert should not crash the process', async (t) => {
   const socket = new tls.Socket(a, {
     isServer: true,
     cert: Buffer.from('not a valid PEM cert'),
-    key: fs.readFileSync('test/fixtures/cert.key')
+    key
   })
 
   socket.on('error', (err) => {

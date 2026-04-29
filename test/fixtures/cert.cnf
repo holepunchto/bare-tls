@@ -6,7 +6,8 @@ prompt = no
 C = US
 CN = www.example.com
 [v3_req]
-keyUsage = critical, digitalSignature, keyAgreement
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, digitalSignature, keyAgreement, keyCertSign
 extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
 [alt_names]
