@@ -10,8 +10,8 @@
 #include <openssl/x509.h>
 #include <stddef.h>
 
-extern const unsigned char bare_tls_root_certs[];
-extern const size_t bare_tls_root_certs_len;
+extern const unsigned char bare_tls__certs[];
+extern const size_t bare_tls__certs_len;
 
 typedef struct {
   SSL_CTX *ssl;
@@ -211,7 +211,7 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
 
   SSL_CTX_set_options(ssl, SSL_OP_NO_TICKET);
 
-  BIO *bio = BIO_new_mem_buf(bare_tls_root_certs, (int) bare_tls_root_certs_len);
+  BIO *bio = BIO_new_mem_buf(bare_tls__certs, (int) bare_tls__certs_len);
   assert(bio != NULL);
 
   X509_STORE *store = SSL_CTX_get_cert_store(ssl);

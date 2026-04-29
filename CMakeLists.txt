@@ -19,25 +19,25 @@ endif()
 
 fetch_package("github:google/boringssl#0.20260211.0")
 
-set(root_certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/root-certificates.pem")
+set(certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/certificates.pem")
 
 file(DOWNLOAD
   "https://curl.se/ca/cacert-2026-03-19.pem"
-  "${root_certificates_bundle}"
+  "${certificates_bundle}"
   TLS_VERSION 1.2
   TLS_VERIFY ON
 )
 
-file(READ "${root_certificates_bundle}" root_certificates_data HEX)
+file(READ "${certificates_bundle}" certificates_data HEX)
 
-string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," root_certificates_array "${root_certificates_data}")
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," certificates_array "${certificates_data}")
 
-set(root_certificates "${CMAKE_CURRENT_BINARY_DIR}/root-certificates.c")
+set(certificates "${CMAKE_CURRENT_BINARY_DIR}/certificates.c")
 
-file(WRITE "${root_certificates}"
+file(WRITE "${certificates}"
   "#include <stddef.h>\n\n"
-  "const unsigned char bare_tls_root_certs[] = {\n${root_certificates_array}\n};\n\n"
-  "const size_t bare_tls_root_certs_len = sizeof(bare_tls_root_certs);\n"
+  "const unsigned char bare_tls__certs[] = {\n${certificates_array}\n};\n\n"
+  "const size_t bare_tls__certs_len = sizeof(bare_tls__certs);\n"
 )
 
 add_bare_module(bare_tls)
@@ -46,7 +46,7 @@ target_sources(
   ${bare_tls}
   PRIVATE
     binding.c
-    "${root_certificates}"
+    "${certificates}"
 )
 
 target_link_libraries(

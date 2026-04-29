@@ -1,4 +1,4 @@
-name: Root certificates
+name: Certificates
 on:
   schedule:
     - cron: 0 0 * * 1
