@@ -417,7 +417,7 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     X509_VERIFY_PARAM *param = SSL_get0_param(ssl);
     assert(param != NULL);
 
-    err = X509_VERIFY_PARAM_set1_host(param, (char *) host, len - 1 /* exclude NULL */);
+    err = X509_VERIFY_PARAM_set1_host(param, (char *) host, len - 1 /* NULL */);
     assert(err == 1);
 
     free(host);
