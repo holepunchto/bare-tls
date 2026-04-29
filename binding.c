@@ -10,6 +10,9 @@
 #include <openssl/x509.h>
 #include <stddef.h>
 
+extern const unsigned char bare_tls_root_certs[];
+extern const size_t bare_tls_root_certs_len;
+
 typedef struct {
   SSL_CTX *ssl;
   BIO_METHOD *io;
@@ -191,9 +194,14 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
     goto err;
   }
 
-  BIO_meth_set_read(io, bare_tls__on_read);
-  BIO_meth_set_write(io, bare_tls__on_write);
-  BIO_meth_set_ctrl(io, bare_tls__on_ctrl);
+  err = BIO_meth_set_read(io, bare_tls__on_read);
+  assert(err == 1);
+
+  err = BIO_meth_set_write(io, bare_tls__on_write);
+  assert(err == 1);
+
+  err = BIO_meth_set_ctrl(io, bare_tls__on_ctrl);
+  assert(err == 1);
 
   err = SSL_CTX_set_ex_data(ssl, 0, (void *) context);
   assert(err == 1);
@@ -202,6 +210,25 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   assert(err == 1);
 
   SSL_CTX_set_options(ssl, SSL_OP_NO_TICKET);
+
+  BIO *bio = BIO_new_mem_buf(bare_tls_root_certs, (int) bare_tls_root_certs_len);
+  assert(bio != NULL);
+
+  X509_STORE *store = SSL_CTX_get_cert_store(ssl);
+  assert(store != NULL);
+
+  X509 *cert;
+  while ((cert = PEM_read_bio_X509(bio, NULL, NULL, NULL)) != NULL) {
+    err = X509_STORE_add_cert(store, cert);
+    assert(err == 1);
+
+    X509_free(cert);
+  }
+
+  ERR_clear_error();
+
+  err = BIO_free(bio);
+  assert(err == 1);
 
   SSL_CTX_set_alpn_select_cb(ssl, bare_tls__on_alpn_select, NULL);
 
@@ -298,11 +325,15 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     assert(err == 0);
 
     BIO *io = BIO_new(BIO_s_mem());
-    BIO_write(io, pem, (int) len);
+    assert(io != NULL);
+
+    err = BIO_write(io, pem, (int) len);
+    assert(err == (int) len);
 
     X509 *certificate = socket->certificate = PEM_read_bio_X509(io, NULL, NULL, NULL);
 
-    BIO_free(io);
+    err = BIO_free(io);
+    assert(err == 1);
 
     if (certificate == NULL) {
       SSL_free(ssl);
@@ -332,15 +363,21 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     assert(err == 0);
 
     BIO *io = BIO_new(BIO_s_mem());
-    BIO_write(io, pem, (int) len);
+    assert(io != NULL);
+
+    err = BIO_write(io, pem, (int) len);
+    assert(err == (int) len);
 
     EVP_PKEY *key = socket->key = PEM_read_bio_PrivateKey(io, NULL, NULL, NULL);
 
     char *mem_data;
     long mem_len = BIO_get_mem_data(io, &mem_data);
+    assert(mem_len >= 0);
+
     OPENSSL_cleanse(mem_data, mem_len);
 
-    BIO_free(io);
+    err = BIO_free(io);
+    assert(err == 1);
 
     if (key == NULL) {
       SSL_free(ssl);
@@ -378,7 +415,10 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     assert(err == 1);
 
     X509_VERIFY_PARAM *param = SSL_get0_param(ssl);
-    X509_VERIFY_PARAM_set1_host(param, (char *) host, 0);
+    assert(param != NULL);
+
+    err = X509_VERIFY_PARAM_set1_host(param, (char *) host, len - 1 /* exclude NULL */);
+    assert(err == 1);
 
     free(host);
   }
@@ -394,22 +434,25 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     assert(err == 0);
 
     BIO *io = BIO_new_mem_buf(pem, (int) len);
+    assert(io != NULL);
 
     X509_STORE *store = X509_STORE_new();
+    assert(store != NULL);
 
     X509 *cert;
     while ((cert = PEM_read_bio_X509(io, NULL, NULL, NULL)) != NULL) {
-      X509_STORE_add_cert(store, cert);
+      err = X509_STORE_add_cert(store, cert);
+      assert(err == 1);
+
       X509_free(cert);
     }
 
     ERR_clear_error();
 
-    BIO_free(io);
+    err = BIO_free(io);
+    assert(err == 1);
 
-    SSL_set0_verify_cert_store(ssl, store);
-  } else {
-    err = SSL_CTX_set_default_verify_paths(context->ssl);
+    err = SSL_set0_verify_cert_store(ssl, store);
     assert(err == 1);
   }
 

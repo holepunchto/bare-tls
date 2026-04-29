@@ -169,6 +169,19 @@ test('net server + client', async (t) => {
     .end('ping')
 })
 
+test('net connect to example.com', async (t) => {
+  t.plan(2)
+
+  const client = tls.connect({ port: 443, host: 'example.com' })
+
+  client
+    .on('connect', () => {
+      t.pass('handshake succeeded')
+      client.end()
+    })
+    .on('close', () => t.pass('client closed'))
+})
+
 test('underlying socket error before handshake', async (t) => {
   t.plan(2)
 
