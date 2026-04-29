@@ -1,0 +1,29 @@
+name: Root certificates
+on:
+  schedule:
+    - cron: 0 0 * * 1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: Check for updates
+    steps:
+      - uses: holepunchto/actions/checkout@v1
+      - name: Compare root certificates
+        run: |
+          pinned=$(grep -oE 'cacert-[0-9]{4}-[0-9]{2}-[0-9]{2}\.pem' CMakeLists.txt)
+
+          pinned_hash=$(curl -sf "https://curl.se/ca/$pinned" | sha256sum | cut -d' ' -f1)
+          latest_hash=$(curl -sf "https://curl.se/ca/cacert.pem" | sha256sum | cut -d' ' -f1)
+
+          echo "Pinned: $pinned ($pinned_hash)"
+          echo "Latest: $latest_hash"
+
+          if [ "$pinned_hash" != "$latest_hash" ]; then
+            echo "::error::Root certificates are out of date. Update the bundle URL in CMakeLists.txt."
+            exit 1
+          fi
+
+          echo "Root certificates are up to date."

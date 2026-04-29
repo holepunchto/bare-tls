@@ -19,7 +19,7 @@ endif()
 
 fetch_package("github:google/boringssl#0.20260211.0")
 
-set(root_certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/roots.pem")
+set(root_certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/root-certificates.pem")
 
 file(DOWNLOAD
   "https://curl.se/ca/cacert-2026-03-19.pem"
@@ -32,7 +32,7 @@ file(READ "${root_certificates_bundle}" root_certificates_data HEX)
 
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," root_certificates_array "${root_certificates_data}")
 
-set(root_certificates "${CMAKE_CURRENT_BINARY_DIR}/roots.c")
+set(root_certificates "${CMAKE_CURRENT_BINARY_DIR}/root-certificates.c")
 
 file(WRITE "${root_certificates}"
   "#include <stddef.h>\n\n"
