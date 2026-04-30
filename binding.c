@@ -8,6 +8,7 @@
 #include <openssl/mem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
+#include <limits.h>
 #include <stddef.h>
 
 extern const unsigned char bare_tls__certs[];
@@ -614,7 +615,9 @@ bare_tls_read(js_env_t *env, js_callback_info_t *info) {
   bool retry = false;
   bool eof = false;
 
-  err = SSL_read(socket->ssl, buffer, len);
+  if (len > INT_MAX) len = INT_MAX;
+
+  err = SSL_read(socket->ssl, buffer, (int) len);
 
   if (err <= 0) {
     err = SSL_get_error(socket->ssl, err);
@@ -662,7 +665,9 @@ bare_tls_write(js_env_t *env, js_callback_info_t *info) {
 
   bool retry = false;
 
-  err = SSL_write(socket->ssl, buffer, len);
+  if (len > INT_MAX) len = INT_MAX;
+
+  err = SSL_write(socket->ssl, buffer, (int) len);
 
   if (err <= 0) {
     err = SSL_get_error(socket->ssl, err);
