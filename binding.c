@@ -221,9 +221,18 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   X509 *cert;
   while ((cert = PEM_read_bio_X509(bio, NULL, NULL, NULL)) != NULL) {
     err = X509_STORE_add_cert(store, cert);
-    assert(err == 1);
 
     X509_free(cert);
+
+    if (err != 1) {
+      BIO_free(bio);
+
+      SSL_CTX_free(ssl);
+
+      BIO_meth_free(io);
+
+      goto err;
+    }
   }
 
   ERR_clear_error();
@@ -434,13 +443,33 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     assert(err == 0);
 
     err = SSL_set_tlsext_host_name(ssl, (char *) host);
-    assert(err == 1);
+
+    if (err != 1) {
+      free(host);
+
+      if (socket->certificate) X509_free(socket->certificate);
+      if (socket->key) EVP_PKEY_free(socket->key);
+
+      SSL_free(ssl);
+
+      goto err;
+    }
 
     X509_VERIFY_PARAM *param = SSL_get0_param(ssl);
     assert(param != NULL);
 
     err = X509_VERIFY_PARAM_set1_host(param, (char *) host, len - 1 /* NULL */);
-    assert(err == 1);
+
+    if (err != 1) {
+      free(host);
+
+      if (socket->certificate) X509_free(socket->certificate);
+      if (socket->key) EVP_PKEY_free(socket->key);
+
+      SSL_free(ssl);
+
+      goto err;
+    }
 
     free(host);
   }
@@ -464,9 +493,21 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     X509 *cert;
     while ((cert = PEM_read_bio_X509(io, NULL, NULL, NULL)) != NULL) {
       err = X509_STORE_add_cert(store, cert);
-      assert(err == 1);
 
       X509_free(cert);
+
+      if (err != 1) {
+        BIO_free(io);
+
+        X509_STORE_free(store);
+
+        if (socket->certificate) X509_free(socket->certificate);
+        if (socket->key) EVP_PKEY_free(socket->key);
+
+        SSL_free(ssl);
+
+        goto err;
+      }
     }
 
     ERR_clear_error();
@@ -475,7 +516,17 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     assert(err == 1);
 
     err = SSL_set0_verify_cert_store(ssl, store);
-    assert(err == 1);
+
+    if (err != 1) {
+      X509_STORE_free(store);
+
+      if (socket->certificate) X509_free(socket->certificate);
+      if (socket->key) EVP_PKEY_free(socket->key);
+
+      SSL_free(ssl);
+
+      goto err;
+    }
   }
 
   bool has_alpn;
