@@ -332,10 +332,9 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
 
     X509 *certificate = socket->certificate = PEM_read_bio_X509(io, NULL, NULL, NULL);
 
-    err = BIO_free(io);
-    assert(err == 1);
-
     if (certificate == NULL) {
+      BIO_free(io);
+
       SSL_free(ssl);
 
       goto err;
@@ -344,12 +343,34 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     err = SSL_use_certificate(ssl, certificate);
 
     if (err == 0) {
+      BIO_free(io);
+
       SSL_free(ssl);
 
       X509_free(certificate);
 
       goto err;
     }
+
+    X509 *chain_cert;
+    while ((chain_cert = PEM_read_bio_X509(io, NULL, NULL, NULL)) != NULL) {
+      err = SSL_add1_chain_cert(ssl, chain_cert);
+
+      X509_free(chain_cert);
+
+      if (err == 0) {
+        BIO_free(io);
+
+        SSL_free(ssl);
+
+        goto err;
+      }
+    }
+
+    ERR_clear_error();
+
+    err = BIO_free(io);
+    assert(err == 1);
   }
 
   bool has_key;

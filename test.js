@@ -7,6 +7,10 @@ const tls = require('.')
 const cert = fs.readFileSync('test/fixtures/cert.crt')
 const key = fs.readFileSync('test/fixtures/cert.key')
 
+const chain = fs.readFileSync('test/fixtures/chain.crt')
+const chainKey = fs.readFileSync('test/fixtures/leaf.key')
+const chainCA = fs.readFileSync('test/fixtures/leaf.ca.crt')
+
 test('basic', async (t) => {
   t.plan(4)
 
@@ -513,6 +517,32 @@ test('tls socket forwards errors from underlying socket during destroy', async (
     .end()
 
   server.end()
+})
+
+test('certificate chain', async (t) => {
+  t.plan(4)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert: chain,
+    key: chainKey
+  })
+
+  const client = new tls.Socket(b, { ca: chainCA })
+
+  server
+    .on('data', (data) => {
+      t.alike(data, Buffer.from('ping'), 'ping')
+      server.end('pong')
+    })
+    .on('close', () => t.pass('server closed'))
+
+  client
+    .on('data', (data) => t.alike(data, Buffer.from('pong'), 'pong'))
+    .on('close', () => t.pass('client closed'))
+    .end('ping')
 })
 
 test('invalid key should not crash the process', async (t) => {
