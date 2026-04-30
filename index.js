@@ -27,8 +27,6 @@ exports.Socket = class TLSSocket extends Duplex {
     this._state = 0
 
     this._socket = socket
-    this._key = key
-    this._cert = cert
     this._allowHalfOpen = allowHalfOpen
 
     this._pendingOpen = null
