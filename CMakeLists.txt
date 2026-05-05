@@ -32,13 +32,9 @@ file(READ "${certificates_bundle}" certificates_data HEX)
 
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," certificates_array "${certificates_data}")
 
-set(certificates "${CMAKE_CURRENT_BINARY_DIR}/certificates.c")
+set(certificates "${CMAKE_CURRENT_BINARY_DIR}/certificates.h")
 
-file(WRITE "${certificates}"
-  "#include <stddef.h>\n\n"
-  "const unsigned char bare_tls__certs[] = {\n${certificates_array}\n};\n\n"
-  "const size_t bare_tls__certs_len = sizeof(bare_tls__certs);\n"
-)
+configure_file(lib/certificates.h.in "${certificates}" @ONLY)
 
 add_bare_module(bare_tls)
 
@@ -53,4 +49,10 @@ target_link_libraries(
   ${bare_tls}
   PUBLIC
     ssl
+)
+
+target_include_directories(
+  ${bare_tls}
+  PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
 )
