@@ -11,8 +11,7 @@
 #include <openssl/x509.h>
 #include <stddef.h>
 
-extern const unsigned char bare_tls__certs[];
-extern const size_t bare_tls__certs_len;
+#include "certificates.h"
 
 typedef struct {
   SSL_CTX *ssl;
