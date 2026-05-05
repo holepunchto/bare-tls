@@ -56,7 +56,7 @@ options = {
 
 `cert` and `key` are `Buffer`s containing PEM-encoded certificate and private key data, respectively.
 
-`host` sets the SNI (Server Name Indication) extension and enables hostname verification against the server certificate.
+`host` enables hostname verification against the server certificate. For DNS names it is also sent as the SNI (Server Name Indication) extension; for IP literals it is matched against the certificate's IP SANs and SNI is suppressed per RFC 6066. Required for client sockets unless `rejectUnauthorized` is `false`.
 
 `rejectUnauthorized` controls whether the client rejects connections when certificate verification fails. Defaults to `true`.
 
@@ -126,7 +126,7 @@ Emitted on server error.
 
 #### `const socket = tls.connect(options[, onconnect])`
 
-Creates a TCP connection and wraps it with TLS. `options` are passed to both the underlying TCP socket and `tls.Socket`. At minimum, `port` must be specified. If `host` is provided, it is used for both the TCP connection target and TLS hostname verification.
+Creates a TCP connection and wraps it with TLS. `options` are passed to both the underlying TCP socket and `tls.Socket`. At minimum, `port` must be specified. `host` is used for both the TCP connection target and TLS hostname verification, and defaults to `'localhost'`.
 
 #### `const socket = tls.connect(port[, host][, onconnect])`
 

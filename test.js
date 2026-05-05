@@ -22,7 +22,7 @@ test('basic', async (t) => {
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
     .on('data', (data) => {
@@ -48,7 +48,7 @@ test('connect event', async (t) => {
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
     .on('connect', () => t.pass('server handshake'))
@@ -72,7 +72,7 @@ test('destroy server socket on connect', async (t) => {
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
     .on('connect', () => {
@@ -97,7 +97,7 @@ test('destroy client socket on connect', async (t) => {
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server.end()
 
@@ -122,7 +122,7 @@ test('destroy client on data', async (t) => {
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server.write('First')
 
@@ -191,7 +191,7 @@ test('underlying socket error before handshake', async (t) => {
 
   const [a, b] = pipe()
 
-  const client = new tls.Socket(b)
+  const client = new tls.Socket(b, { host: 'www.example.com' })
 
   client
     .on('error', (err) => t.is(err.message, 'connection failed'))
@@ -232,7 +232,8 @@ test('alpn negotiation - h2', async (t) => {
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2', 'http/1.1'],
-    ca: cert
+    ca: cert,
+    host: 'www.example.com'
   })
 
   server
@@ -266,7 +267,8 @@ test('alpn negotiation - fallback to http/1.1', async (t) => {
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2', 'http/1.1'],
-    ca: cert
+    ca: cert,
+    host: 'www.example.com'
   })
 
   server
@@ -297,7 +299,7 @@ test('alpn negotiation - no alpn configured', async (t) => {
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
     .on('connect', () => {
@@ -330,7 +332,8 @@ test('alpn negotiation - no overlap', async (t) => {
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2'],
-    ca: cert
+    ca: cert,
+    host: 'www.example.com'
   })
 
   server
@@ -363,7 +366,8 @@ test('alpn negotiation - client only', async (t) => {
 
   const client = new tls.Socket(b, {
     alpnProtocols: ['h2', 'http/1.1'],
-    ca: cert
+    ca: cert,
+    host: 'www.example.com'
   })
 
   server
@@ -395,7 +399,7 @@ test('alpn negotiation - server only', async (t) => {
     alpnProtocols: ['h2', 'http/1.1']
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
     .on('connect', () => {
@@ -425,7 +429,7 @@ test('destroying tls socket destroys underlying socket', async (t) => {
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   b.on('close', () => t.pass('underlying socket closed'))
 
@@ -460,7 +464,7 @@ test('destroying tls socket waits for underlying socket to close', async (t) => 
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   b.on('close', () => {
     t.pass('underlying socket closed')
@@ -509,7 +513,7 @@ test('tls socket forwards errors from underlying socket during destroy', async (
     key
   })
 
-  const client = new tls.Socket(b, { ca: cert })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   client
     .on('error', (err) => t.is(err.message, 'boom', 'underlying error forwarded'))
@@ -530,7 +534,7 @@ test('certificate chain', async (t) => {
     key: chainKey
   })
 
-  const client = new tls.Socket(b, { ca: chainCA })
+  const client = new tls.Socket(b, { ca: chainCA, host: 'www.example.com' })
 
   server
     .on('data', (data) => {
