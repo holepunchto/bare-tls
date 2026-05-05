@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <bare.h>
 #include <js.h>
+#include <limits.h>
 #include <openssl/base.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -8,7 +9,6 @@
 #include <openssl/mem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
-#include <limits.h>
 #include <stddef.h>
 
 extern const unsigned char bare_tls__certs[];
@@ -442,33 +442,37 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     err = js_get_value_string_utf8(env, argv[4], host, len, NULL);
     assert(err == 0);
 
-    err = SSL_set_tlsext_host_name(ssl, (char *) host);
-
-    if (err != 1) {
-      free(host);
-
-      if (socket->certificate) X509_free(socket->certificate);
-      if (socket->key) EVP_PKEY_free(socket->key);
-
-      SSL_free(ssl);
-
-      goto err;
-    }
-
     X509_VERIFY_PARAM *param = SSL_get0_param(ssl);
     assert(param != NULL);
 
-    err = X509_VERIFY_PARAM_set1_host(param, (char *) host, len - 1 /* NULL */);
+    if (X509_VERIFY_PARAM_set1_ip_asc(param, (char *) host) != 1) {
+      ERR_clear_error();
 
-    if (err != 1) {
-      free(host);
+      err = X509_VERIFY_PARAM_set1_host(param, (char *) host, len - 1 /* NULL */);
 
-      if (socket->certificate) X509_free(socket->certificate);
-      if (socket->key) EVP_PKEY_free(socket->key);
+      if (err != 1) {
+        free(host);
 
-      SSL_free(ssl);
+        if (socket->certificate) X509_free(socket->certificate);
+        if (socket->key) EVP_PKEY_free(socket->key);
 
-      goto err;
+        SSL_free(ssl);
+
+        goto err;
+      }
+
+      err = SSL_set_tlsext_host_name(ssl, (char *) host);
+
+      if (err != 1) {
+        free(host);
+
+        if (socket->certificate) X509_free(socket->certificate);
+        if (socket->key) EVP_PKEY_free(socket->key);
+
+        SSL_free(ssl);
+
+        goto err;
+      }
     }
 
     free(host);

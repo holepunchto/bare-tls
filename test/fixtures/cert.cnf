@@ -13,3 +13,4 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = www.example.com
 DNS.2 = example.com
+DNS.3 = localhost

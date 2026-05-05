@@ -120,6 +120,8 @@ exports.createConnection = function createConnection(...args) {
     onconnect = args[1]
   }
 
+  if (!opts.host && !opts.path) opts.host = 'localhost'
+
   return new TLSNetSocket(net.createConnection(opts, onconnect), opts)
 }
 
