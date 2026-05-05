@@ -23,9 +23,7 @@ exports.Socket = class TLSSocket extends Duplex {
     } = opts
 
     if (!isServer && rejectUnauthorized && !host) {
-      throw new TypeError(
-        "'host' is required for client sockets when 'rejectUnauthorized' is true"
-      )
+      throw new TypeError("'host' is required for client sockets when 'rejectUnauthorized' is true")
     }
 
     super({ eagerOpen })
