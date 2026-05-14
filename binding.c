@@ -1,3 +1,7 @@
+#if !defined(_WIN32) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+
 #include <assert.h>
 #include <bare.h>
 #include <js.h>
@@ -11,7 +15,30 @@
 #include <openssl/x509.h>
 #include <stddef.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
+
 #include "certificates.h"
+
+static void
+bare_tls__pin(void) {
+#if defined(_WIN32)
+  HMODULE module;
+  GetModuleHandleExA(
+    GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+    (LPCSTR) &bare_tls__pin,
+    &module
+  );
+#else
+  Dl_info info;
+  if (dladdr((void *) &bare_tls__pin, &info) && info.dli_fname) {
+    dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD | RTLD_NODELETE);
+  }
+#endif
+}
 
 typedef struct {
   SSL_CTX *ssl;
@@ -810,6 +837,8 @@ bare_tls_alpn_protocol(js_env_t *env, js_callback_info_t *info) {
 static js_value_t *
 bare_tls_exports(js_env_t *env, js_value_t *exports) {
   int err;
+
+  bare_tls__pin();
 
 #define V(name, fn) \
   { \
