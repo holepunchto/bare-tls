@@ -22,7 +22,7 @@ fetch_package("github:google/boringssl#0.20260211.0")
 set(certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/certificates.pem")
 
 file(DOWNLOAD
-  "https://curl.se/ca/cacert-2026-03-19.pem"
+  "https://curl.se/ca/cacert-2026-05-14.pem"
   "${certificates_bundle}"
   TLS_VERSION 1.2
   TLS_VERIFY ON
