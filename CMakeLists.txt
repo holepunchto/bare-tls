@@ -17,6 +17,8 @@ else()
   enable_language(ASM)
 endif()
 
+set(BUILD_TESTING OFF)
+
 fetch_package("github:google/boringssl#0.20260211.0")
 
 set(certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/certificates.pem")
