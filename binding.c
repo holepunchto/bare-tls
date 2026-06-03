@@ -14,6 +14,7 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -360,6 +361,8 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     err = js_get_typedarray_info(env, argv[2], NULL, (void **) &pem, &len, NULL, NULL);
     assert(err == 0);
 
+    if (len > INT_MAX) len = INT_MAX;
+
     BIO *io = BIO_new(BIO_s_mem());
     assert(io != NULL);
 
@@ -419,6 +422,8 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     err = js_get_typedarray_info(env, argv[3], NULL, (void **) &pem, &len, NULL, NULL);
     assert(err == 0);
 
+    if (len > INT_MAX) len = INT_MAX;
+
     BIO *io = BIO_new(BIO_s_mem());
     assert(io != NULL);
 
@@ -461,6 +466,15 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     size_t len;
     err = js_get_value_string_utf8(env, argv[4], NULL, 0, &len);
     assert(err == 0);
+
+    if (len == SIZE_MAX) {
+      if (socket->certificate) X509_free(socket->certificate);
+      if (socket->key) EVP_PKEY_free(socket->key);
+
+      SSL_free(ssl);
+
+      goto err;
+    }
 
     len += 1 /* NULL */;
 
@@ -513,6 +527,8 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     size_t len;
     err = js_get_typedarray_info(env, argv[6], NULL, (void **) &pem, &len, NULL, NULL);
     assert(err == 0);
+
+    if (len > INT_MAX) len = INT_MAX;
 
     BIO *io = BIO_new_mem_buf(pem, (int) len);
     assert(io != NULL);
@@ -569,13 +585,15 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     err = js_get_typedarray_info(env, argv[7], NULL, (void **) &alpn, &len, NULL, NULL);
     assert(err == 0);
 
+    if (len > UINT_MAX) len = UINT_MAX;
+
     if (is_server) {
       socket->alpn = malloc(len);
       socket->alpn_len = len;
 
       memcpy(socket->alpn, alpn, len);
     } else {
-      err = SSL_set_alpn_protos(ssl, alpn, len);
+      err = SSL_set_alpn_protos(ssl, alpn, (unsigned int) len);
       assert(err == 0);
     }
   }
