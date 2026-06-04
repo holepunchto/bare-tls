@@ -319,7 +319,7 @@ test('alpn negotiation - no alpn configured', async (t) => {
 })
 
 test('alpn negotiation - no overlap', async (t) => {
-  t.plan(6)
+  t.plan(4)
 
   const [a, b] = pipe()
 
@@ -337,18 +337,12 @@ test('alpn negotiation - no overlap', async (t) => {
   })
 
   server
-    .on('connect', () => {
-      t.pass('server handshake')
-      t.is(server.alpnProtocol, null, 'server alpnProtocol is null on no overlap')
-    })
+    .on('error', () => t.pass('server errored on no overlap'))
     .on('close', () => t.pass('server closed'))
     .end()
 
   client
-    .on('connect', () => {
-      t.pass('client handshake')
-      t.is(client.alpnProtocol, null, 'client alpnProtocol is null on no overlap')
-    })
+    .on('error', () => t.pass('client errored on no overlap'))
     .on('close', () => t.pass('client closed'))
     .end()
 })
