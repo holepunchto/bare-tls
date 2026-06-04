@@ -418,6 +418,24 @@ test('alpn negotiation - server only', async (t) => {
     .end()
 })
 
+test('alpnProtocol getter returns null after destroy', async (t) => {
+  t.plan(1)
+
+  const [, b] = pipe()
+
+  const client = new tls.Socket(b, {
+    alpnProtocols: ['h2'],
+    ca: cert,
+    host: 'www.example.com'
+  })
+
+  client.on('close', () => {
+    t.is(client.alpnProtocol, null, 'alpnProtocol is null after destroy')
+  })
+
+  client.destroy()
+})
+
 test('destroying tls socket destroys underlying socket', async (t) => {
   t.plan(2)
 
