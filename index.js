@@ -97,7 +97,7 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   get alpnProtocol() {
-    return binding.alpnProtocol(this._handle)
+    return this._handle ? binding.alpnProtocol(this._handle) : null
   }
 
   _onconnect() {
