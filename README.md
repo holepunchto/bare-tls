@@ -29,108 +29,190 @@ const client = tls.connect({ port: 8443, host: 'localhost' })
 client.on('data', (data) => console.log(data)).end('ping')
 ```
 
+<!-- bare-refgen:api start -->
+
 ## API
 
-#### `const socket = new tls.Socket(stream[, options])`
+### errors
 
-Wraps an existing duplex `stream` with TLS. The underlying `stream` handles transport; the TLS socket handles encryption and decryption.
+#### `errors.from(err: Error): TLSError`
 
-Options include:
+Create a `TLSError` from `err`, copying its message and code.
 
-```js
-options = {
-  isServer: false,
-  cert: null,
-  key: null,
-  host: null,
-  rejectUnauthorized: true,
-  ca: null,
-  alpnProtocols: null,
-  eagerOpen: true,
-  allowHalfOpen: true,
-  readBufferSize: 65536
-}
-```
+**Parameters**
 
-`isServer` controls whether the socket acts as a TLS server or client. If `true`, `cert` and `key` must be provided.
+| Parameter | Type    | Default | Description           |
+| --------- | ------- | ------- | --------------------- |
+| `err`     | `Error` | —       | The error to convert. |
 
-`cert` and `key` are `Buffer`s containing PEM-encoded certificate and private key data, respectively.
+### TLSSocket
 
-`host` enables hostname verification against the server certificate. For DNS names it is also sent as the SNI (Server Name Indication) extension; for IP literals it is matched against the certificate's IP SANs and SNI is suppressed per RFC 6066. Required for client sockets unless `rejectUnauthorized` is `false`.
+#### `new TLSSocket(socket: Duplex, opts?: TLSSocketOptions)`
 
-`rejectUnauthorized` controls whether the client rejects connections when certificate verification fails. Defaults to `true`.
+Wrap the duplex stream `socket` with TLS.
 
-`ca` is a `Buffer` containing one or more PEM-encoded CA certificates. When provided, only these CAs are used for verification instead of the bundled Mozilla root certificates.
+**Parameters**
 
-`alpnProtocols` is an array of ALPN protocol name strings, ordered by preference.
+| Parameter | Type               | Default | Description                                                                                                         |
+| --------- | ------------------ | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| `socket`  | `Duplex`           | —       | The duplex stream to wrap; it handles transport while the TLS socket handles encryption and decryption.             |
+| `opts?`   | `TLSSocketOptions` | —       | Options; `rejectUnauthorized`, `eagerOpen`, and `allowHalfOpen` default to `true`, and `readBufferSize` to `65536`. |
 
-#### `socket.socket`
+**Throws**
 
-The underlying duplex stream.
+- `TypeError` — `host` is missing for a client socket while `rejectUnauthorized` is `true`.
+- `RangeError` — an ALPN protocol name is empty or longer than 255 bytes.
 
-#### `socket.encrypted`
-
-Always `true`.
-
-#### `socket.alpnProtocol`
+#### `alpnProtocol: string | null`
 
 The negotiated ALPN protocol as a string, or `null` if no protocol was negotiated.
 
-#### `event: 'connect'`
+#### `encrypted: true`
 
-Emitted when the TLS handshake completes.
+Always `true`.
 
-#### `const server = tls.createServer([options][, onconnection])`
+#### `socket: Duplex`
+
+The underlying duplex stream.
+
+### Functions
+
+#### `createServer(opts?: TLSSocketOptions, onconnection?: (socket: TLSSocket) => void): TLSNetServer`
 
 Creates a TLS server that listens for TCP connections and wraps them with TLS. Incoming connections are emitted as `'connection'` events with a `tls.Socket` instance. Options are the same as `tls.Socket`, plus any options supported by <https://github.com/holepunchto/bare-net>.
 
-#### `server.listen(...args)`
+**Parameters**
 
-Start listening for connections. Arguments are passed through to the underlying TCP server.
+| Parameter       | Type                          | Default | Description                                                                                                 |
+| --------------- | ----------------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `opts?`         | `TLSSocketOptions`            | —       | Options applied to each incoming socket; the same as `TLSSocket`, plus any options supported by `bare-net`. |
+| `onconnection?` | `(socket: TLSSocket) => void` | —       | Called on each `'connection'` event.                                                                        |
 
-#### `server.close([onclose])`
+#### `createConnection`
 
-Stop listening for connections.
+```ts
+createConnection(opts: TLSSocketOptions & { port: number; host?: string }, onconnect?: () => void): TLSSocket
+```
 
-#### `server.address()`
+Creates a TCP connection and wraps it with TLS. `opts` are passed to both the underlying TCP socket and `TLSSocket`. At minimum, `port` must be specified.
 
-Returns the bound address of the server.
+**Parameters**
 
-#### `server.listening`
+| Parameter    | Type                                                 | Default | Description                                                                                                                |
+| ------------ | ---------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `opts`       | `TLSSocketOptions & { port: number; host?: string }` | —       | Options passed to both the underlying TCP socket and `TLSSocket`; `port` is required and `host` defaults to `'localhost'`. |
+| `onconnect?` | `() => void`                                         | —       | Called when the connection is established.                                                                                 |
 
-Whether or not the server is listening.
+### Constants and variables
 
-#### `server.ref()`
+#### `constants`
 
-Ref the server.
+```ts
+constants: {
+  state: {
+    CONNECTED: number
+    ATTACHED: number
+  }
+}
+```
 
-#### `server.unref()`
+Internal state flags used by `TLSSocket`, such as `state.CONNECTED`.
 
-Unref the server.
+### Types
 
-#### `event: 'listening'`
+#### `TLSSocketEvents`
 
-Emitted when the server starts listening.
+```ts
+interface TLSSocketEvents {
+  connect: []
+  data: [data: unknown]
+  end: []
+  readable: []
+  piping: [dest: Writable]
+  close: []
+  error: [err: Error]
+  drain: []
+  finish: []
+  pipe: [src: Readable]
+}
+```
 
-#### `event: 'connection'`
+Events emitted by a `TLSSocket`.
 
-Emitted when a new TLS connection is established.
+#### `TLSSocketOptions`
 
-#### `event: 'close'`
+```ts
+interface TLSSocketOptions {
+  isServer?: boolean
+  cert?: ArrayBufferView
+  key?: ArrayBufferView
+  host?: string
+  rejectUnauthorized?: boolean
+  ca?: ArrayBufferView
+  alpnProtocols?: string[]
+  eagerOpen?: boolean
+  allowHalfOpen?: boolean
+  readBufferSize?: number
+}
+```
 
-Emitted when the server closes.
+Options for a `TLSSocket`.
 
-#### `event: 'error'`
+#### `TLSNetServerEvents`
 
-Emitted on server error.
+```ts
+interface TLSNetServerEvents {
+  listening: []
+  connection: [socket: TLSSocket]
+  error: [err: Error]
+  close: []
+}
+```
 
-#### `const socket = tls.connect(options[, onconnect])`
+Events emitted by a TLS server.
 
-Creates a TCP connection and wraps it with TLS. `options` are passed to both the underlying TCP socket and `tls.Socket`. At minimum, `port` must be specified. `host` is used for both the TCP connection target and TLS hostname verification, and defaults to `'localhost'`.
+#### `TLSNetServer`
 
-#### `const socket = tls.connect(port[, host][, onconnect])`
+```ts
+interface TLSNetServer {
+  readonly listening: boolean
+}
+```
 
-Shorthand for `tls.connect({ port, host })`.
+A TLS server over TCP; incoming connections are wrapped with TLS and emitted as `'connection'` events.
+
+## `bare-tls/constants`
+
+### Constants and variables
+
+#### `constants.constants`
+
+```ts
+constants: {
+  state: {
+    CONNECTED: number
+    ATTACHED: number
+  }
+}
+```
+
+Internal state flags used by `TLSSocket`, such as `state.CONNECTED`.
+
+## `bare-tls/errors`
+
+### TLSError
+
+#### `TLSError.from(err: Error): TLSError`
+
+Create a `TLSError` from `err`, copying its message and code.
+
+**Parameters**
+
+| Parameter | Type    | Default | Description           |
+| --------- | ------- | ------- | --------------------- |
+| `err`     | `Error` | —       | The error to convert. |
+
+<!-- bare-refgen:api end -->
 
 ## License
 
