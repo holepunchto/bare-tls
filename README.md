@@ -31,7 +31,7 @@ client.on('data', (data) => console.log(data)).end('ping')
 
 ## API
 
-See the [full API reference](https://docs.pears.com/reference/bare/modules/bare-tls).
+See the [`bare-tls` reference](https://docs.pears.com/reference/bare/modules/bare-tls).
 
 ## License
 
