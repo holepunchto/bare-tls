@@ -173,6 +173,40 @@ test('net server + client', async (t) => {
     .end('ping')
 })
 
+test('finishing waits for the socket underneath to flush', async (t) => {
+  t.plan(3)
+
+  const server = tls.createServer({ cert, key }, (socket) => {
+    socket
+      // Whoever is closing the connection takes finishing as their cue to
+      // destroy the socket, so the tail of the message must already be on its
+      // way out by the time it fires.
+      .on('finish', () => {
+        t.pass('server finished')
+
+        socket.destroy()
+      })
+      .end('pong')
+  })
+
+  server.listen()
+
+  await once(server, 'listening')
+
+  const client = tls.connect({ ...server.address(), ca: cert })
+
+  const chunks = []
+
+  client
+    .on('data', (data) => chunks.push(data))
+    .on('close', () => {
+      t.alike(Buffer.concat(chunks), Buffer.from('pong'), 'whole message received')
+
+      server.close(() => t.pass('server stopped'))
+    })
+    .end()
+})
+
 test('net connect to example.com', async (t) => {
   t.plan(2)
 

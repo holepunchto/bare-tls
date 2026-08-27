@@ -1,4 +1,4 @@
-const { Duplex, Writable } = require('bare-stream')
+const { Duplex, Writable, isFinished } = require('bare-stream')
 const binding = require('./binding')
 const constants = require('./lib/constants')
 const errors = require('./lib/errors')
@@ -274,12 +274,23 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _final(cb) {
+    let err = null
+
     try {
       binding.shutdown(this._handle)
+    } catch (e) {
+      err = errors.from(e)
+    }
 
-      cb(null)
-    } catch (err) {
-      cb(err)
+    if (isFinished(this._socket)) cb(err)
+    else {
+      const onfinish = () => {
+        this._socket.off('finish', onfinish).off('close', onfinish)
+
+        cb(err)
+      }
+
+      this._socket.on('finish', onfinish).on('close', onfinish)
     }
 
     this._socket.end()
