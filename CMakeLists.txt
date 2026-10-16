@@ -26,6 +26,7 @@ set(certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/certificates.pem")
 file(DOWNLOAD
   "https://curl.se/ca/cacert-2026-09-25.pem"
   "${certificates_bundle}"
+  EXPECTED_HASH SHA256=a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505
   TLS_VERSION 1.2
   TLS_VERIFY ON
 )

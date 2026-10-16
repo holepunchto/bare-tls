@@ -245,21 +245,23 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   X509_STORE *store = SSL_CTX_get_cert_store(ssl);
   assert(store != NULL);
 
+  size_t certs = 0;
+
   X509 *cert;
   while ((cert = PEM_read_bio_X509(bio, NULL, NULL, NULL)) != NULL) {
     err = X509_STORE_add_cert(store, cert);
 
     X509_free(cert);
 
-    if (err != 1) {
-      BIO_free(bio);
+    if (err != 1) goto err_store;
 
-      SSL_CTX_free(ssl);
+    certs++;
+  }
 
-      BIO_meth_free(io);
+  uint32_t reason = ERR_peek_last_error();
 
-      goto err;
-    }
+  if (certs == 0 || ERR_GET_LIB(reason) != ERR_LIB_PEM || ERR_GET_REASON(reason) != PEM_R_NO_START_LINE) {
+    goto err_store;
   }
 
   ERR_clear_error();
@@ -278,6 +280,13 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
 
   return handle;
+
+err_store:
+  BIO_free(bio);
+
+  SSL_CTX_free(ssl);
+
+  BIO_meth_free(io);
 
 err:
   js_throw_error(env, ERR_reason_symbol_name(ERR_peek_last_error()), "Context initialisation failed");
