@@ -40,6 +40,8 @@ exports.Socket = class TLSSocket extends Duplex {
     this._reading = Buffer.alloc(readBufferSize)
     this._buffer = []
     this._buffered = 0
+    this._paused = false
+    this._ended = false
 
     this._ondata = this._ondata.bind(this)
     this._ondrain = this._ondrain.bind(this)
@@ -114,49 +116,7 @@ exports.Socket = class TLSSocket extends Duplex {
     this._buffer.push(data)
     this._buffered += data.byteLength
 
-    while (this._buffered > 0) {
-      if (this._state & constants.state.CONNECTED) {
-        let read
-        try {
-          read = binding.read(this._handle, this._reading)
-        } catch (err) {
-          return this.destroy(errors.from(err))
-        }
-
-        if (read < 0) break
-
-        if (read === 0) {
-          this.push(null)
-          if (this._allowHalfOpen === false) this.end()
-          return
-        }
-
-        const copy = Buffer.allocUnsafe(read)
-        copy.set(this._reading.subarray(0, read))
-
-        this.push(copy)
-      } else {
-        try {
-          if (binding.handshake(this._handle)) this._onconnect()
-          else break
-        } catch (err) {
-          err = errors.from(err)
-
-          // Defer so any alert the handshake wrote to the underlying socket
-          // gets a chance to flush before we tear it down.
-          queueMicrotask(() => {
-            if (this._pendingOpen) {
-              const cb = this._pendingOpen
-              this._pendingOpen = null
-              cb(err)
-            } else {
-              this.destroy(err)
-            }
-          })
-          return
-        }
-      }
-    }
+    this._decrypt()
   }
 
   _ondrain() {
@@ -167,7 +127,9 @@ exports.Socket = class TLSSocket extends Duplex {
   }
 
   _onend() {
-    this.push(null)
+    this._ended = true
+
+    if (this._paused === false) this.push(null)
   }
 
   _onclose() {
@@ -228,6 +190,67 @@ exports.Socket = class TLSSocket extends Duplex {
     this._socket.write(Buffer.from(data.slice()))
 
     return data.byteLength
+  }
+
+  _decrypt() {
+    while (this._buffered > 0 && this._paused === false && this._handle !== null) {
+      if (this._state & constants.state.CONNECTED) {
+        let read
+        try {
+          read = binding.read(this._handle, this._reading)
+        } catch (err) {
+          return this.destroy(errors.from(err))
+        }
+
+        if (read < 0) break
+
+        if (read === 0) {
+          this.push(null)
+          if (this._allowHalfOpen === false) this.end()
+          return
+        }
+
+        const copy = Buffer.allocUnsafe(read)
+        copy.set(this._reading.subarray(0, read))
+
+        if (this.push(copy) === false) {
+          this._paused = true
+          this._socket.pause()
+        }
+      } else {
+        try {
+          if (binding.handshake(this._handle)) this._onconnect()
+          else break
+        } catch (err) {
+          err = errors.from(err)
+
+          // Defer so any alert the handshake wrote to the underlying socket
+          // gets a chance to flush before we tear it down.
+          queueMicrotask(() => {
+            if (this._pendingOpen) {
+              const cb = this._pendingOpen
+              this._pendingOpen = null
+              cb(err)
+            } else {
+              this.destroy(err)
+            }
+          })
+          return
+        }
+      }
+    }
+  }
+
+  _read() {
+    if (this._paused === false) return
+
+    this._paused = false
+    this._decrypt()
+
+    if (this._paused) return
+
+    if (this._ended) this.push(null)
+    else this._socket.resume()
   }
 
   _attach() {

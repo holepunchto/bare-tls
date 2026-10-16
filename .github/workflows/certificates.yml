@@ -22,7 +22,7 @@ jobs:
           echo "Latest: $latest_hash"
 
           if [ "$pinned_hash" != "$latest_hash" ]; then
-            echo "::error::Root certificates are out of date. Update the bundle URL in CMakeLists.txt."
+            echo "::error::Root certificates are out of date. Update the bundle URL and EXPECTED_HASH in CMakeLists.txt to the latest dated bundle (SHA256=$latest_hash)."
             exit 1
           fi
 

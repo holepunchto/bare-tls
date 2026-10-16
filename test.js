@@ -633,28 +633,108 @@ test('invalid cert should not crash the process', async (t) => {
   b.destroy()
 })
 
-function pipe() {
+test('backpressure reaches the underlying socket', async (t) => {
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert,
+    key
+  })
+
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
+
+  const chunk = Buffer.alloc(65536)
+  for (let i = 0; i < chunk.byteLength; i++) chunk[i] = i % 251
+
+  const chunks = 64
+
+  await once(client, 'connect')
+
+  for (let i = 0; i < chunks; i++) client.write(chunk)
+  client.end()
+
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  t.ok(Duplex.isPaused(a), 'underlying socket paused')
+
+  const received = []
+  server.on('data', (data) => received.push(data))
+  await once(server, 'end')
+
+  t.alike(Buffer.concat(received), Buffer.concat(new Array(chunks).fill(chunk)))
+})
+
+test('destroy server socket on connect with application data in the same read', (t) => {
+  t.plan(2)
+
+  const [a, b] = pipe({ batch: true })
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert,
+    key
+  })
+
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
+
+  server
+    .on('connect', () => {
+      t.pass('server handshake')
+      server.destroy()
+    })
+    .on('close', () => t.pass('server closed'))
+
+  client.on('error', () => {}).on('connect', () => client.write('hello'))
+})
+
+function pipe(opts = {}) {
+  const { batch = false } = opts
+
   const a = new Duplex({
     write(data, encoding, cb) {
-      b.push(data)
+      send(b, data)
       cb(null)
     },
     final(cb) {
-      b.push(null)
+      send(b, null)
       cb(null)
     }
   })
 
   const b = new Duplex({
     write(data, encoding, cb) {
-      a.push(data)
+      send(a, data)
       cb(null)
     },
     final(cb) {
-      a.push(null)
+      send(a, null)
       cb(null)
     }
   })
+
+  const pending = new Map()
+
+  function send(stream, data) {
+    if (batch === false) return stream.push(data)
+
+    let queue = pending.get(stream)
+
+    if (queue === undefined) {
+      queue = []
+      pending.set(stream, queue)
+
+      setTimeout(() => {
+        pending.delete(stream)
+
+        const chunks = queue.filter((chunk) => chunk !== null)
+        if (chunks.length > 0) stream.push(Buffer.concat(chunks))
+        if (queue.includes(null)) stream.push(null)
+      }, 10)
+    }
+
+    queue.push(data)
+  }
 
   return [a, b]
 }
