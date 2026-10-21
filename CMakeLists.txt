@@ -24,9 +24,9 @@ fetch_package("github:google/boringssl#0.20260211.0")
 set(certificates_bundle "${CMAKE_CURRENT_BINARY_DIR}/certificates.pem")
 
 file(DOWNLOAD
-  "https://curl.se/ca/cacert-2026-09-25.pem"
+  "https://curl.se/ca/cacert-2026-10-20.pem"
   "${certificates_bundle}"
-  EXPECTED_HASH SHA256=a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505
+  EXPECTED_HASH SHA256=796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe
   TLS_VERSION 1.2
   TLS_VERIFY ON
 )
