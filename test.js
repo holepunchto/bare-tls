@@ -37,6 +37,31 @@ test('basic', async (t) => {
     .end('ping')
 })
 
+test('client rejects a host that is a non-canonical IPv4 address', (t) => {
+  for (const host of [
+    '0127.0.0.1',
+    '127.1',
+    '0x7f.0.0.1',
+    '2130706433',
+    '127.0.0.1.',
+    '256.0.0.1'
+  ]) {
+    const [, b] = pipe()
+
+    t.exception.all(() => new tls.Socket(b, { ca: cert, host }), /canonical IPv4/, host)
+  }
+})
+
+test('client accepts a canonical IPv4 address or a DNS name as host', (t) => {
+  for (const host of ['127.0.0.1', 'www.example.com', '1.example.com']) {
+    const [a, b] = pipe()
+
+    t.execution(() => new tls.Socket(b, { ca: cert, host }).destroy(), host)
+
+    a.destroy()
+  }
+})
+
 test('connect event', async (t) => {
   t.plan(4)
 
