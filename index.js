@@ -26,6 +26,10 @@ exports.Socket = class TLSSocket extends Duplex {
       throw new TypeError("'host' is required for client sockets when 'rejectUnauthorized' is true")
     }
 
+    if (!isServer && host && isNonCanonicalIPv4(host)) {
+      throw new TypeError(`'host' must be a canonical IPv4 address, got '${host}'`)
+    }
+
     super({ eagerOpen })
 
     this._state = 0
@@ -346,6 +350,23 @@ exports.Socket = class TLSSocket extends Duplex {
 }
 
 exports.TLSSocket = exports.Socket // For Node.js compatibility
+
+const ipv4 =
+  /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$/
+
+// The resolver reads a host that ends in a number as IPv4, even in forms like
+// 0127.0.0.1 or 127.1. The certificate check only knows the canonical form.
+function isNonCanonicalIPv4(host) {
+  const labels = host.split('.')
+
+  if (labels.at(-1) === '') labels.pop()
+
+  const last = labels.at(-1)
+
+  if (!/^(?:[0-9]+|0x[0-9a-f]*)$/i.test(last)) return false
+
+  return !ipv4.test(host)
+}
 
 exports.constants = constants
 exports.errors = errors
