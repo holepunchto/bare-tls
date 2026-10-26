@@ -3,12 +3,42 @@ const net = require('bare-net')
 const tls = require('bare-tls')
 
 class TLSNetSocket extends tls.Socket {
+  constructor(socket, opts) {
+    super(socket, opts)
+
+    socket.on('timeout', this._ontimeout.bind(this))
+  }
+
+  setKeepAlive(...args) {
+    this.socket.setKeepAlive(...args)
+    return this
+  }
+
+  setNoDelay(...args) {
+    this.socket.setNoDelay(...args)
+    return this
+  }
+
+  setTimeout(ms, ontimeout) {
+    if (ontimeout) {
+      if (ms === 0) this.removeListener('timeout', ontimeout)
+      else this.once('timeout', ontimeout)
+    }
+
+    this.socket.setTimeout(ms)
+    return this
+  }
+
   ref() {
     this.socket.ref()
   }
 
   unref() {
     this.socket.unref()
+  }
+
+  _ontimeout() {
+    this.emit('timeout')
   }
 }
 
@@ -122,7 +152,12 @@ exports.createConnection = function createConnection(...args) {
 
   if (!opts.host && !opts.path) opts.host = 'localhost'
 
-  return new TLSNetSocket(net.createConnection(opts, onconnect), opts)
+  const socket = new TLSNetSocket(net.createConnection(opts), opts)
+
+  // Called once the TLS handshake is done, not when the TCP connection opens.
+  if (onconnect) socket.once('connect', onconnect)
+
+  return socket
 }
 
 exports.createServer = function createServer(opts, onconnection) {

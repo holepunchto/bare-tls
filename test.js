@@ -3,6 +3,7 @@ const { once } = require('bare-events')
 const { Duplex } = require('bare-stream')
 const fs = require('bare-fs')
 const tls = require('.')
+const constants = require('./lib/constants')
 
 const cert = fs.readFileSync('test/fixtures/cert.crt')
 const key = fs.readFileSync('test/fixtures/cert.key')
@@ -196,6 +197,50 @@ test('net server + client', async (t) => {
       })
     })
     .end('ping')
+})
+
+test('net client connect callback runs after the TLS handshake', async (t) => {
+  t.plan(3)
+
+  const server = tls.createServer({ cert, key }, (socket) => socket.end('pong'))
+
+  server.listen()
+
+  await once(server, 'listening')
+
+  const client = tls.connect({ ...server.address(), ca: cert }, () => {
+    t.ok(client._state & constants.state.CONNECTED, 'handshake done when the callback runs')
+  })
+
+  client
+    .on('data', (data) => t.alike(data, Buffer.from('pong'), 'pong'))
+    .on('close', () => server.close(() => t.pass('server stopped')))
+    .end()
+})
+
+test('net client forwards setTimeout, setKeepAlive and setNoDelay', async (t) => {
+  t.plan(5)
+
+  const server = tls.createServer({ cert, key }, () => {})
+
+  server.listen()
+
+  await once(server, 'listening')
+
+  const client = tls.connect({ ...server.address(), ca: cert })
+
+  t.is(client.setKeepAlive(true, 1000), client, 'setKeepAlive returns the socket')
+  t.is(client.setNoDelay(true), client, 'setNoDelay returns the socket')
+  t.is(
+    client.setTimeout(50, () => {
+      t.pass('timeout callback')
+      client.destroy()
+    }),
+    client,
+    'setTimeout returns the socket'
+  )
+
+  client.on('error', () => {}).on('close', () => server.close(() => t.pass('server stopped')))
 })
 
 test('finishing waits for the socket underneath to flush', async (t) => {

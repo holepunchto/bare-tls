@@ -63,6 +63,21 @@ export class TLSSocket {
 
 export { TLSSocket as Socket }
 
+/** A `TLSSocket` over a `bare-net` socket, as returned by `createConnection()`. */
+export interface TLSNetSocket extends TLSSocket {
+  /** Forwarded to the underlying `bare-net` socket. */
+  setKeepAlive(enable?: boolean, initialDelay?: number): this
+  /** Forwarded to the underlying `bare-net` socket. */
+  setNoDelay(noDelay?: boolean): this
+  /**
+   * Forwarded to the underlying `bare-net` socket; its `'timeout'` is re-emitted on this socket.
+   * @param ontimeout - Added as a one-time `'timeout'` listener, or removed when `ms` is `0`.
+   */
+  setTimeout(ms: number, ontimeout?: () => void): this
+  ref(): void
+  unref(): void
+}
+
 /** Events emitted by a TLS server. */
 export interface TLSNetServerEvents {
   /** Emitted when the server starts listening. */
@@ -102,13 +117,13 @@ export function createServer(
  * socket and `TLSSocket`. At minimum, `port` must be specified.
  * @param opts - Options passed to both the underlying TCP socket and `TLSSocket`; `port` is
  * required and `host` defaults to `'localhost'`.
- * @param onconnect - Called when the connection is established.
+ * @param onconnect - Called once the TLS handshake has completed (the socket's `'connect'` event).
  */
 export function createConnection(
   opts: TLSSocketOptions & { port: number; host?: string },
   onconnect?: () => void
-): TLSSocket
+): TLSNetSocket
 
-export function createConnection(port: number, host?: string, onconnect?: () => void): TLSSocket
+export function createConnection(port: number, host?: string, onconnect?: () => void): TLSNetSocket
 
 export { createConnection as connect }
