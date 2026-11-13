@@ -268,7 +268,7 @@ test('net server emits tlsClientError when the TLS handshake fails', async (t) =
   await once(server, 'listening')
 
   tls
-    .connect({ ...server.address(), host: 'www.example.com' })
+    .connect(server.address())
     .on('error', () => {})
     .on('close', () => server.close(() => t.pass('server stopped')))
 })
