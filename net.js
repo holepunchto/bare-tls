@@ -6,6 +6,7 @@ class TLSNetSocket extends tls.Socket {
   constructor(socket, opts) {
     super(socket, opts)
 
+    socket.on('connect', this._onsocketconnect.bind(this))
     socket.on('timeout', this._ontimeout.bind(this))
   }
 
@@ -37,15 +38,19 @@ class TLSNetSocket extends tls.Socket {
     this.socket.unref()
   }
 
+  _onsocketconnect() {
+    this.emit('connect')
+  }
+
   _ontimeout() {
     this.emit('timeout')
   }
 }
 
 class TLSNetServer extends EventEmitter {
-  constructor(opts = {}, onconnection) {
+  constructor(opts = {}, onsecureconnection) {
     if (typeof opts === 'function') {
-      onconnection = opts
+      onsecureconnection = opts
       opts = {}
     }
 
@@ -56,7 +61,6 @@ class TLSNetServer extends EventEmitter {
       rejectUnauthorized = true,
       ca = null,
       alpnProtocols = null,
-      eagerOpen = true,
       allowHalfOpen = true
     } = opts
 
@@ -69,7 +73,6 @@ class TLSNetServer extends EventEmitter {
       rejectUnauthorized,
       ca,
       alpnProtocols,
-      eagerOpen,
       allowHalfOpen
     }
 
@@ -80,7 +83,7 @@ class TLSNetServer extends EventEmitter {
       .on('error', this._onerror.bind(this))
       .on('close', this._onclose.bind(this))
 
-    if (onconnection) this.on('connection', onconnection)
+    if (onsecureconnection) this.on('secureConnection', onsecureconnection)
   }
 
   get listening() {
@@ -114,7 +117,23 @@ class TLSNetServer extends EventEmitter {
   }
 
   _onconnection(socket) {
-    this.emit('connection', new TLSNetSocket(socket, { ...this._opts, isServer: true }))
+    this.emit('connection', socket)
+
+    const tlsSocket = new TLSNetSocket(socket, { ...this._opts, isServer: true })
+
+    const onerror = (err) => {
+      tlsSocket.off('secureConnect', onsecureconnect)
+
+      this.emit('tlsClientError', err, tlsSocket)
+    }
+
+    const onsecureconnect = () => {
+      tlsSocket.off('error', onerror)
+
+      this.emit('secureConnection', tlsSocket)
+    }
+
+    tlsSocket.once('error', onerror).once('secureConnect', onsecureconnect)
   }
 
   _onerror(err) {
@@ -154,8 +173,7 @@ exports.createConnection = function createConnection(...args) {
 
   const socket = new TLSNetSocket(net.createConnection(opts), opts)
 
-  // Called once the TLS handshake is done, not when the TCP connection opens.
-  if (onconnect) socket.once('connect', onconnect)
+  if (onconnect) socket.once('secureConnect', onconnect)
 
   return socket
 }

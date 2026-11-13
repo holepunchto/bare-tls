@@ -109,7 +109,7 @@ exports.Socket = class TLSSocket extends Duplex {
   _onconnect() {
     this._state |= constants.state.CONNECTED
 
-    this.emit('connect')
+    this.emit('secureConnect')
 
     const cb = this._pendingOpen
     this._pendingOpen = null
@@ -133,17 +133,26 @@ exports.Socket = class TLSSocket extends Duplex {
   _onend() {
     this._ended = true
 
-    if (this._paused === false) this.push(null)
+    if (this._pendingOpen) this._ondisconnect()
+    else if (this._paused === false) this.push(null)
   }
 
   _onclose() {
     this._socket.off('close', this._onclose).off('error', this._onerror)
+
+    if (this._pendingOpen) this._ondisconnect()
 
     if (this._pendingDestroy) {
       const cb = this._pendingDestroy
       this._pendingDestroy = null
       cb()
     }
+  }
+
+  _ondisconnect() {
+    const cb = this._pendingOpen
+    this._pendingOpen = null
+    cb(errors.CONNECTION_RESET('Socket disconnected before the TLS handshake completed'))
   }
 
   _onerror(err) {
@@ -230,14 +239,12 @@ exports.Socket = class TLSSocket extends Duplex {
 
           // Defer so any alert the handshake wrote to the underlying socket
           // gets a chance to flush before we tear it down.
+          const cb = this._pendingOpen
+          this._pendingOpen = null
+
           queueMicrotask(() => {
-            if (this._pendingOpen) {
-              const cb = this._pendingOpen
-              this._pendingOpen = null
-              cb(err)
-            } else {
-              this.destroy(err)
-            }
+            if (cb) cb(err)
+            else this.destroy(err)
           })
           return
         }
