@@ -377,6 +377,24 @@ test('underlying socket error before handshake, server', async (t) => {
   a.destroy(new Error('connection failed'))
 })
 
+test('underlying socket ending before handshake, server', async (t) => {
+  t.plan(2)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, {
+    isServer: true,
+    cert,
+    key
+  })
+
+  server
+    .on('error', (err) => t.is(err.code, 'ECONNRESET'))
+    .on('close', () => t.pass('server closed'))
+
+  b.end()
+})
+
 test('alpn negotiation - h2', async (t) => {
   t.plan(6)
 
