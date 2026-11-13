@@ -109,7 +109,7 @@ exports.Socket = class TLSSocket extends Duplex {
   _onconnect() {
     this._state |= constants.state.CONNECTED
 
-    this.emit('connect')
+    this.emit('secureConnect')
 
     const cb = this._pendingOpen
     this._pendingOpen = null

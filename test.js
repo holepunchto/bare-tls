@@ -3,7 +3,6 @@ const { once } = require('bare-events')
 const { Duplex } = require('bare-stream')
 const fs = require('bare-fs')
 const tls = require('.')
-const constants = require('./lib/constants')
 
 const cert = fs.readFileSync('test/fixtures/cert.crt')
 const key = fs.readFileSync('test/fixtures/cert.key')
@@ -63,7 +62,7 @@ test('client accepts a canonical IPv4 address or a DNS name as host', (t) => {
   }
 })
 
-test('connect event', async (t) => {
+test('secureConnect event', async (t) => {
   t.plan(4)
 
   const [a, b] = pipe()
@@ -77,12 +76,12 @@ test('connect event', async (t) => {
   const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
-    .on('connect', () => t.pass('server handshake'))
+    .on('secureConnect', () => t.pass('server handshake'))
     .on('close', () => t.pass('server closed'))
     .end()
 
   client
-    .on('connect', () => t.pass('client handshake'))
+    .on('secureConnect', () => t.pass('client handshake'))
     .on('close', () => t.pass('client closed'))
     .end()
 })
@@ -101,7 +100,7 @@ test('destroy server socket on connect', async (t) => {
   const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('server handshake')
       a.destroy(new Error('abort'))
     })
@@ -109,7 +108,7 @@ test('destroy server socket on connect', async (t) => {
     .on('close', () => t.pass('server closed'))
     .end()
 
-  client.on('connect', () => t.pass('client handshake')).end()
+  client.on('secureConnect', () => t.pass('client handshake')).end()
 })
 
 test('destroy client socket on connect', async (t) => {
@@ -128,7 +127,7 @@ test('destroy client socket on connect', async (t) => {
   server.end()
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('client handshake')
       b.destroy(new Error('abort'))
     })
@@ -153,7 +152,7 @@ test('destroy client on data', async (t) => {
   server.write('First')
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('client handshake')
     })
     .on('data', () => {
@@ -199,23 +198,79 @@ test('net server + client', async (t) => {
     .end('ping')
 })
 
-test('net client connect callback runs after the TLS handshake', async (t) => {
-  t.plan(3)
+test('net client emits connect at TCP connect and secureConnect after the TLS handshake', async (t) => {
+  t.plan(2)
 
-  const server = tls.createServer({ cert, key }, (socket) => socket.end('pong'))
+  const server = tls.createServer({ cert, key }, (socket) => socket.end())
 
   server.listen()
 
   await once(server, 'listening')
 
-  const client = tls.connect({ ...server.address(), ca: cert }, () => {
-    t.ok(client._state & constants.state.CONNECTED, 'handshake done when the callback runs')
-  })
+  const events = []
+
+  const client = tls.connect({ ...server.address(), ca: cert }, () => events.push('callback'))
 
   client
-    .on('data', (data) => t.alike(data, Buffer.from('pong'), 'pong'))
-    .on('close', () => server.close(() => t.pass('server stopped')))
+    .on('connect', () => events.push('connect'))
+    .on('secureConnect', () => events.push('secureConnect'))
+    .on('close', () => {
+      t.alike(events, ['connect', 'callback', 'secureConnect'])
+      server.close(() => t.pass('server stopped'))
+    })
+    .resume()
     .end()
+})
+
+test('net server emits connection at TCP accept and secureConnection after the TLS handshake', async (t) => {
+  t.plan(3)
+
+  const events = []
+
+  const server = tls.createServer({ cert, key }, (socket) => {
+    events.push('callback')
+    socket.end()
+  })
+
+  server
+    .on('connection', (socket) => {
+      events.push('connection')
+      t.absent(socket.encrypted, 'connection gets the TCP socket')
+    })
+    .on('secureConnection', () => events.push('secureConnection'))
+
+  server.listen()
+
+  await once(server, 'listening')
+
+  tls
+    .connect({ ...server.address(), ca: cert })
+    .on('close', () => {
+      t.alike(events, ['connection', 'callback', 'secureConnection'])
+      server.close(() => t.pass('server stopped'))
+    })
+    .resume()
+    .end()
+})
+
+test('net server emits tlsClientError when the TLS handshake fails', async (t) => {
+  t.plan(3)
+
+  const server = tls.createServer({ cert, key }, () => t.fail('secure connection'))
+
+  server.on('tlsClientError', (err, socket) => {
+    t.ok(err, 'handshake failed')
+    t.ok(socket.encrypted, 'tlsClientError gets the TLS socket')
+  })
+
+  server.listen()
+
+  await once(server, 'listening')
+
+  tls
+    .connect({ ...server.address(), host: 'www.example.com' })
+    .on('error', () => {})
+    .on('close', () => server.close(() => t.pass('server stopped')))
 })
 
 test('net client forwards setTimeout, setKeepAlive and setNoDelay', async (t) => {
@@ -283,7 +338,7 @@ test('net connect to example.com', async (t) => {
   const client = tls.connect({ port: 443, host: 'example.com' })
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('handshake succeeded')
       client.end()
     })
@@ -341,7 +396,7 @@ test('alpn negotiation - h2', async (t) => {
   })
 
   server
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('server handshake')
       t.is(server.alpnProtocol, 'h2', 'server negotiated h2')
     })
@@ -349,7 +404,7 @@ test('alpn negotiation - h2', async (t) => {
     .end()
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('client handshake')
       t.is(client.alpnProtocol, 'h2', 'client negotiated h2')
     })
@@ -376,7 +431,7 @@ test('alpn negotiation - fallback to http/1.1', async (t) => {
   })
 
   server
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('server handshake')
       t.is(server.alpnProtocol, 'http/1.1', 'server negotiated http/1.1')
     })
@@ -384,7 +439,7 @@ test('alpn negotiation - fallback to http/1.1', async (t) => {
     .end()
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('client handshake')
       t.is(client.alpnProtocol, 'http/1.1', 'client negotiated http/1.1')
     })
@@ -406,7 +461,7 @@ test('alpn negotiation - no alpn configured', async (t) => {
   const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('server handshake')
       t.is(server.alpnProtocol, null, 'server alpnProtocol is null')
     })
@@ -414,7 +469,7 @@ test('alpn negotiation - no alpn configured', async (t) => {
     .end()
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('client handshake')
       t.is(client.alpnProtocol, null, 'client alpnProtocol is null')
     })
@@ -469,7 +524,7 @@ test('alpn negotiation - client only', async (t) => {
   })
 
   server
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('server handshake')
       t.is(server.alpnProtocol, null, 'server alpnProtocol is null')
     })
@@ -477,7 +532,7 @@ test('alpn negotiation - client only', async (t) => {
     .end()
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('client handshake')
       t.is(client.alpnProtocol, null, 'client alpnProtocol is null')
     })
@@ -500,7 +555,7 @@ test('alpn negotiation - server only', async (t) => {
   const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('server handshake')
       t.is(server.alpnProtocol, null, 'server alpnProtocol is null')
     })
@@ -508,7 +563,7 @@ test('alpn negotiation - server only', async (t) => {
     .end()
 
   client
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('client handshake')
       t.is(client.alpnProtocol, null, 'client alpnProtocol is null')
     })
@@ -549,7 +604,7 @@ test('destroying tls socket destroys underlying socket', async (t) => {
 
   b.on('close', () => t.pass('underlying socket closed'))
 
-  client.on('connect', () => client.destroy()).on('close', () => t.pass('client closed'))
+  client.on('secureConnect', () => client.destroy()).on('close', () => t.pass('client closed'))
 
   server.end()
 })
@@ -587,7 +642,7 @@ test('destroying tls socket waits for underlying socket to close', async (t) => 
   })
 
   client
-    .on('connect', () => client.destroy())
+    .on('secureConnect', () => client.destroy())
     .on('close', () => {
       t.pass('client closed')
     })
@@ -719,7 +774,7 @@ test('backpressure reaches the underlying socket', async (t) => {
 
   const chunks = 64
 
-  await once(client, 'connect')
+  await once(client, 'secureConnect')
 
   for (let i = 0; i < chunks; i++) client.write(chunk)
   client.end()
@@ -749,13 +804,13 @@ test('destroy server socket on connect with application data in the same read', 
   const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
 
   server
-    .on('connect', () => {
+    .on('secureConnect', () => {
       t.pass('server handshake')
       server.destroy()
     })
     .on('close', () => t.pass('server closed'))
 
-  client.on('error', () => {}).on('connect', () => client.write('hello'))
+  client.on('error', () => {}).on('secureConnect', () => client.write('hello'))
 })
 
 function pipe(opts = {}) {

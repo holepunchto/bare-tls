@@ -1,5 +1,6 @@
 import { Duplex, DuplexEvents } from 'bare-stream'
 import EventEmitter from 'bare-events'
+import { Socket as NetSocket } from 'bare-net'
 import constants from './lib/constants'
 import TLSError from './lib/errors'
 
@@ -8,7 +9,7 @@ export { constants, TLSError as errors }
 /** Events emitted by a `TLSSocket`. */
 export interface TLSSocketEvents extends DuplexEvents {
   /** Emitted when the TLS handshake completes. */
-  connect: []
+  secureConnect: []
 }
 
 /** Options for a `TLSSocket`. */
@@ -63,8 +64,16 @@ export class TLSSocket {
 
 export { TLSSocket as Socket }
 
+/** Events emitted by a `TLSNetSocket`. */
+export interface TLSNetSocketEvents extends TLSSocketEvents {
+  /** Emitted when the underlying TCP connection opens, before the TLS handshake. */
+  connect: []
+  /** Emitted when the underlying socket times out. */
+  timeout: []
+}
+
 /** A `TLSSocket` over a `bare-net` socket, as returned by `createConnection()`. */
-export interface TLSNetSocket extends TLSSocket {
+export interface TLSNetSocket extends TLSSocket<TLSNetSocketEvents> {
   /** Forwarded to the underlying `bare-net` socket. */
   setKeepAlive(enable?: boolean, initialDelay?: number): this
   /** Forwarded to the underlying `bare-net` socket. */
@@ -82,8 +91,12 @@ export interface TLSNetSocket extends TLSSocket {
 export interface TLSNetServerEvents {
   /** Emitted when the server starts listening. */
   listening: []
-  /** Emitted when a new TLS connection is established. */
-  connection: [socket: TLSSocket]
+  /** Emitted when a new TCP connection is accepted, before the TLS handshake. */
+  connection: [socket: NetSocket]
+  /** Emitted when the TLS handshake of a new connection completes. */
+  secureConnection: [socket: TLSNetSocket]
+  /** Emitted when a new connection fails before the TLS handshake completes. */
+  tlsClientError: [err: Error, socket: TLSNetSocket]
   /** Emitted on server error. */
   error: [err: Error]
   /** Emitted when the server closes. */
@@ -91,8 +104,8 @@ export interface TLSNetServerEvents {
 }
 
 /**
- * A TLS server over TCP; incoming connections are wrapped with TLS and emitted as `'connection'`
- * events.
+ * A TLS server over TCP; incoming connections are wrapped with TLS and emitted as
+ * `'secureConnection'` events once the handshake completes.
  */
 export interface TLSNetServer extends EventEmitter<TLSNetServerEvents> {
   /** Whether or not the server is listening. */
@@ -101,23 +114,27 @@ export interface TLSNetServer extends EventEmitter<TLSNetServerEvents> {
 
 /**
  * Creates a TLS server that listens for TCP connections and wraps them with TLS. Incoming
- * connections are emitted as `'connection'` events with a `tls.Socket` instance. Options are the
- * same as `tls.Socket`, plus any options supported by <https://github.com/holepunchto/bare-net>.
- * @param opts - Options applied to each incoming socket; the same as `TLSSocket`, plus any options
- * supported by `bare-net`.
- * @param onconnection - Called on each `'connection'` event.
+ * connections are emitted as `'secureConnection'` events with a `tls.Socket` instance once the
+ * handshake completes. Options are the same as `tls.Socket`, plus any options supported by
+ * <https://github.com/holepunchto/bare-net>.
+ * @param opts - Options applied to each incoming socket; the same as `TLSSocket`, except
+ * `eagerOpen`, plus any options supported by `bare-net`.
+ * @param onsecureconnection - Called on each `'secureConnection'` event.
  */
 export function createServer(
-  opts?: TLSSocketOptions,
-  onconnection?: (socket: TLSSocket) => void
+  opts?: Omit<TLSSocketOptions, 'eagerOpen'>,
+  onsecureconnection?: (socket: TLSNetSocket) => void
 ): TLSNetServer
+
+export function createServer(onsecureconnection?: (socket: TLSNetSocket) => void): TLSNetServer
 
 /**
  * Creates a TCP connection and wraps it with TLS. `opts` are passed to both the underlying TCP
  * socket and `TLSSocket`. At minimum, `port` must be specified.
  * @param opts - Options passed to both the underlying TCP socket and `TLSSocket`; `port` is
  * required and `host` defaults to `'localhost'`.
- * @param onconnect - Called once the TLS handshake has completed (the socket's `'connect'` event).
+ * @param onconnect - Called once the TLS handshake has completed (the socket's `'secureConnect'`
+ * event).
  */
 export function createConnection(
   opts: TLSSocketOptions & { port: number; host?: string },
