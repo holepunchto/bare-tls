@@ -39,7 +39,7 @@ set(certificates "${CMAKE_CURRENT_BINARY_DIR}/certificates.h")
 
 configure_file(lib/certificates.h.in "${certificates}" @ONLY)
 
-add_bare_module(bare_tls)
+add_bare_module(bare_tls INSTALL PRIVACY_MANIFEST PrivacyInfo.xcprivacy)
 
 target_sources(
   ${bare_tls}
