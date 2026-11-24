@@ -26,6 +26,10 @@ exports.Socket = class TLSSocket extends Duplex {
       throw new TypeError("'host' is required for client sockets when 'rejectUnauthorized' is true")
     }
 
+    if (host && host.includes('\0')) {
+      throw new TypeError(`'host' must not contain null bytes, got '${host}'`)
+    }
+
     if (!isServer && host && isNonCanonicalIPv4(host)) {
       throw new TypeError(`'host' must be a canonical IPv4 address, got '${host}'`)
     }
