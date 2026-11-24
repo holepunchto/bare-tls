@@ -52,6 +52,14 @@ test('client rejects a host that is a non-canonical IPv4 address', (t) => {
   }
 })
 
+test('client rejects a host with a NUL', (t) => {
+  for (const host of ['1.2.3.4\0.example.com', 'www.example.com\0.evil.com']) {
+    const [, b] = pipe()
+
+    t.exception.all(() => new tls.Socket(b, { ca: cert, host }), /null bytes/, host)
+  }
+})
+
 test('client accepts a canonical IPv4 address or a DNS name as host', (t) => {
   for (const host of ['127.0.0.1', 'www.example.com', '1.example.com']) {
     const [a, b] = pipe()

@@ -15,6 +15,7 @@
 #include <openssl/x509.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -490,6 +491,20 @@ bare_tls_init(js_env_t *env, js_callback_info_t *info) {
     utf8_t *host = malloc(len);
     err = js_get_value_string_utf8(env, argv[4], host, len, NULL);
     assert(err == 0);
+
+    if (strlen((char *) host) != len - 1 /* NULL */) {
+      free(host);
+
+      if (socket->certificate) X509_free(socket->certificate);
+      if (socket->key) EVP_PKEY_free(socket->key);
+
+      SSL_free(ssl);
+
+      err = js_throw_type_error(env, NULL, "Host must not contain null bytes");
+      assert(err == 0);
+
+      return NULL;
+    }
 
     X509_VERIFY_PARAM *param = SSL_get0_param(ssl);
     assert(param != NULL);
