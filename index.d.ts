@@ -55,6 +55,8 @@ export interface TLSSocket<M extends TLSSocketEvents = TLSSocketEvents> extends 
   readonly encrypted: true
   /** The negotiated ALPN protocol as a string, or `null` if no protocol was negotiated. */
   readonly alpnProtocol: string | null
+  /** The key exchange group agreed in the handshake, e.g. `X25519MLKEM768`, or `null` if no group was agreed. */
+  readonly negotiatedGroup: string | null
 }
 
 export class TLSSocket {

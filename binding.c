@@ -240,6 +240,23 @@ bare_tls_context(js_env_t *env, js_callback_info_t *info) {
 
   SSL_CTX_set_options(ssl, SSL_OP_NO_TICKET);
 
+  // Offer the hybrid first. BoringSSL's own default list is {X25519, P-256, P-384}, so without
+  // this call every handshake is classical.
+  static const uint16_t groups[] = {
+    SSL_GROUP_X25519_MLKEM768,
+    SSL_GROUP_X25519,
+    SSL_GROUP_SECP256R1,
+    SSL_GROUP_SECP384R1,
+  };
+
+  if (SSL_CTX_set1_group_ids(ssl, groups, sizeof(groups) / sizeof(groups[0])) != 1) {
+    SSL_CTX_free(ssl);
+
+    BIO_meth_free(io);
+
+    goto err;
+  }
+
   BIO *bio = BIO_new_mem_buf(bare_tls__certs, (int) bare_tls__certs_len);
   assert(bio != NULL);
 
@@ -877,6 +894,37 @@ bare_tls_alpn_protocol(js_env_t *env, js_callback_info_t *info) {
 }
 
 static js_value_t *
+bare_tls_negotiated_group(js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  size_t argc = 1;
+  js_value_t *argv[1];
+
+  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  assert(err == 0);
+
+  assert(argc == 1);
+
+  bare_tls_t *socket;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &socket, NULL);
+  assert(err == 0);
+
+  const char *name = SSL_get_group_name(SSL_get_group_id(socket->ssl));
+
+  js_value_t *result;
+
+  if (name) {
+    err = js_create_string_utf8(env, (const utf8_t *) name, strlen(name), &result);
+    assert(err == 0);
+  } else {
+    err = js_get_null(env, &result);
+    assert(err == 0);
+  }
+
+  return result;
+}
+
+static js_value_t *
 bare_tls_exports(js_env_t *env, js_value_t *exports) {
   int err;
 
@@ -899,6 +947,7 @@ bare_tls_exports(js_env_t *env, js_value_t *exports) {
   V("write", bare_tls_write);
   V("shutdown", bare_tls_shutdown);
   V("alpnProtocol", bare_tls_alpn_protocol);
+  V("negotiatedGroup", bare_tls_negotiated_group);
 #undef V
 
   return exports;

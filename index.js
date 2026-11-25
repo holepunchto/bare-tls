@@ -110,6 +110,10 @@ exports.Socket = class TLSSocket extends Duplex {
     return this._handle ? binding.alpnProtocol(this._handle) : null
   }
 
+  get negotiatedGroup() {
+    return this._handle ? binding.negotiatedGroup(this._handle) : null
+  }
+
   _onconnect() {
     this._state |= constants.state.CONNECTED
 
