@@ -889,3 +889,55 @@ function pipe(opts = {}) {
 
   return [a, b]
 }
+
+test('key exchange groups: X25519MLKEM768 is agreed by default, and both sides report it', (t) => {
+  t.plan(2)
+
+  const [a, b] = pipe()
+
+  const server = new tls.Socket(a, { isServer: true, cert, key })
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
+
+  server.once('data', () => {
+    t.is(server.negotiatedGroup, 'X25519MLKEM768', 'server')
+    server.end('pong')
+  })
+
+  client.on('data', () => t.is(client.negotiatedGroup, 'X25519MLKEM768', 'client')).end('ping')
+})
+
+test('key exchange groups: the ClientHello offers X25519MLKEM768 first, then X25519, P-256, P-384', (t) => {
+  t.plan(1)
+
+  const [a, b] = pipe()
+  const client = new tls.Socket(b, { ca: cert, host: 'www.example.com' })
+
+  a.once('data', (hello) => {
+    t.alike(groups(hello), [0x11ec, 0x001d, 0x0017, 0x0018])
+    client.destroy()
+  })
+  client.on('error', () => {})
+  client.write('ping')
+})
+
+function groups(hello) {
+  // Record header (5), handshake header (4), legacy_version (2), random (32)
+  let p = 5 + 4 + 2 + 32
+  // Skip legacy_session_id, cipher_suites and legacy_compression_methods
+  p += 1 + hello[p]
+  p += 2 + hello.readUInt16BE(p)
+  p += 1 + hello[p]
+  const end = p + 2 + hello.readUInt16BE(p)
+  p += 2
+  while (p < end) {
+    const type = hello.readUInt16BE(p)
+    const len = hello.readUInt16BE(p + 2)
+    // supported_groups
+    if (type === 10) {
+      const out = []
+      for (let i = 0; i < hello.readUInt16BE(p + 4); i += 2) out.push(hello.readUInt16BE(p + 6 + i))
+      return out
+    }
+    p += 4 + len
+  }
+}
